@@ -1,0 +1,5 @@
+2025-01-05 15:43:22,605 - ERROR - Tickers file tickers.txt not found.
+2025-01-05 15:45:36,118 - ERROR - Tickers file tickers.txt not found.
+2025-01-05 15:48:44,296 - ERROR - 
+1 Failed download:
+2025-01-05 15:48:44,296 - ERROR - ['UPRO']: ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\'query2.finance.yahoo.com\', port=443): Max retries exceeded with url: /v8/finance/chart/%ticker%?period1=631170000&period2=1736110124&interval=1d&includePrePost=False&events=div%2Csplits%2CcapitalGains&crumb=OSQHxajAnk8 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x00000205C1927ED0>: Failed to resolve \'query2.finance.yahoo.com\' ([Errno 11001] getaddrinfo failed)"))'))

@@ -1,0 +1,8 @@
+UPRO
+SSO
+SPY
+TLT
+KMLM
+GLD
+^VIX
+^SPX
