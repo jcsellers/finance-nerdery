@@ -1,0 +1,15 @@
+# Configuration file for trading analysis system
+
+database:
+  path: "./data/aligned/aligned_data.db"  # Path to the SQLite database file
+
+output:
+  path: "./results/output.json"  # Output file path for results
+
+tickers:
+  - "SPY"
+  - "UPRO"
+
+date_range:
+  start: "2020-01-01"  # Start date for analysis
+  end: "2023-01-01"    # End date for analysis

@@ -1,0 +1,18 @@
+# Configuration file for trading analysis system
+database:
+  path: "../data/aligned/aligned_data.db"  # Corrected database path
+output:
+  path: "../data/results.json"  # Corrected output path
+tickers:
+  - "SPY"
+  - "UPRO"
+  - "SSO"
+  - "TLT"
+  - "GLD"
+  - "^SPX"
+  - "^VIX"
+  - "DGS10"
+  - "BAMLH0A0HYM2"
+date_range:
+  start: "1990-01-02"  # Start date for analysis
+  end: "2025-01-03"  # End date for analysis

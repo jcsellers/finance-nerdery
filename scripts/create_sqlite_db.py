@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Define the path to the SQLite database
 db_path = '../data/aligned_data.db'
 
-# List of CSV files and corresponding table names
+# List of CSV files and their tickers
 datasets = {
     "UPRO": "../data/aligned/UPRO_cleaned.csv",
     "SSO": "../data/aligned/SSO_cleaned.csv",
@@ -22,50 +22,72 @@ datasets = {
     "BAMLH0A0HYM2": "../data/aligned/BAMLH0A0HYM2_cleaned.csv",
 }
 
-def create_and_populate_database(db_path, datasets):
+# Default columns and types
+required_columns = {
+    'Date': 'TEXT',
+    'Open': 'REAL',
+    'Close': 'REAL',
+    'High': 'REAL',
+    'Low': 'REAL',
+    'Volume': 'INTEGER',
+}
+
+def create_and_populate_unified_table(db_path, datasets):
     """
-    Create a SQLite database and populate it with data from CSV files.
+    Create a unified SQLite database table and populate it with data from CSV files.
     :param db_path: Path to the SQLite database.
-    :param datasets: Dictionary with table names as keys and CSV file paths as values.
+    :param datasets: Dictionary with tickers as keys and CSV file paths as values.
     """
-    # Connect to the SQLite database
     try:
         conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
         logging.info(f"Connected to SQLite database at {db_path}")
+
+        # Create the unified `data` table
+        columns_definition = ", ".join([f"{col} {col_type}" for col, col_type in required_columns.items()])
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS data (
+                ticker TEXT NOT NULL,
+                {columns_definition},
+                PRIMARY KEY (ticker, Date)
+            )
+        ''')
+        logging.info("Table 'data' created.")
+
+        # Populate the `data` table
+        for ticker, csv_path in datasets.items():
+            try:
+                if not os.path.exists(csv_path):
+                    logging.warning(f"File {csv_path} does not exist. Skipping.")
+                    continue
+
+                df = pd.read_csv(csv_path)
+
+                # Ensure required columns are present
+                for col in required_columns:
+                    if col not in df.columns:
+                        logging.warning(f"Column '{col}' missing in {csv_path}. Filling with default values.")
+                        default_value = 0 if required_columns[col] in ['REAL', 'INTEGER'] else None
+                        df[col] = default_value
+
+                # Add ticker column and process dates
+                df['ticker'] = ticker
+                df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d')
+
+                # Write to the database
+                df.to_sql('data', conn, if_exists='append', index=False)
+                logging.info(f"Data for '{ticker}' added to 'data' table.")
+            except Exception as e:
+                logging.error(f"Error processing {csv_path}: {e}")
+
+        conn.commit()
     except sqlite3.Error as e:
-        logging.error(f"Error connecting to SQLite database: {e}")
-        return
-
-    # Create tables and import data
-    for table_name, csv_path in datasets.items():
-        try:
-            # Check if the CSV file exists
-            if not os.path.exists(csv_path):
-                logging.warning(f"File {csv_path} does not exist. Skipping.")
-                continue
-
-            # Load data from the CSV file
-            df = pd.read_csv(csv_path)
-
-            # Ensure 'Date' column exists
-            if 'Date' not in df.columns:
-                logging.warning(f"File {csv_path} does not contain a 'Date' column. Skipping.")
-                continue
-
-            # Set 'Date' as the index and convert to string for SQLite compatibility
-            df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d')
-            df.set_index('Date', inplace=True)
-
-            # Write the data to the SQLite table
-            df.to_sql(table_name, conn, if_exists='replace', index=True, index_label='Date')
-            logging.info(f"Table '{table_name}' created and populated from {csv_path}")
-        except Exception as e:
-            logging.error(f"Error processing {csv_path}: {e}")
-
-    # Close the database connection
-    conn.close()
-    logging.info("Database connection closed.")
+        logging.error(f"SQLite error: {e}")
+    finally:
+        conn.close()
+        logging.info("Database connection closed.")
 
 # Execute the script
 if __name__ == "__main__":
-    create_and_populate_database(db_path, datasets)
+    create_and_populate_unified_table(db_path, datasets)
+
