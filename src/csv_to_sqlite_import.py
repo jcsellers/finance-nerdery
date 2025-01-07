@@ -9,6 +9,16 @@ ALIGNED_DIR = "../aligned"
 DB_PATH = "../aligned_data.db"
 
 def validate_database(db_path, required_schema):
+    """
+    Validate the database schema against the required schema.
+
+    Parameters:
+        db_path (str): Path to the SQLite database file.
+        required_schema (dict): Expected schema in the format {table_name: {column_name: column_type}}.
+
+    Raises:
+        ValueError: If schema validation fails.
+    """
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
@@ -29,6 +39,12 @@ def validate_database(db_path, required_schema):
         conn.close()
 
 def setup_database(db_path):
+    """
+    Ensure the database has the required schema.
+
+    Parameters:
+        db_path (str): Path to the SQLite database file.
+    """
     validate_database(db_path, {
         "data": {
             "ticker": "TEXT",
@@ -39,6 +55,14 @@ def setup_database(db_path):
     })
 
 def import_csv_to_sqlite(csv_path, db_path, table_name="data"):
+    """
+    Import data from a CSV file into an SQLite database.
+
+    Parameters:
+        csv_path (str): Path to the CSV file.
+        db_path (str): Path to the SQLite database file.
+        table_name (str): Name of the target table in SQLite.
+    """
     conn = None
     try:
         df = pd.read_csv(csv_path)
@@ -61,5 +85,24 @@ def import_csv_to_sqlite(csv_path, db_path, table_name="data"):
         if conn:
             conn.close()
 
-def process_all_csv_files(
+def process_all_csv_files(aligned_dir, db_path):
+    """
+    Process all CSV files in the specified directory.
 
+    Parameters:
+        aligned_dir (str): Path to the directory containing aligned CSV files.
+        db_path (str): Path to the SQLite database file.
+    """
+    if not os.path.exists(aligned_dir):
+        logging.error(f"Aligned directory {aligned_dir} does not exist.")
+        return
+
+    for file_name in os.listdir(aligned_dir):
+        if file_name.endswith(".csv"):
+            file_path = os.path.join(aligned_dir, file_name)
+            logging.info(f"Processing file: {file_path}")
+            import_csv_to_sqlite(file_path, db_path)
+
+if __name__ == "__main__":
+    setup_database(DB_PATH)
+    process_all_csv_files(ALIGNED_DIR, DB_PATH)

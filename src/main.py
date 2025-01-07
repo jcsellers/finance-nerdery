@@ -1,8 +1,8 @@
 import sqlite3
+import pandas as pd
 import logging
 import yaml
-import pandas as pd
-from outputs import Outputs
+from outputs import Outputs  # Ensure this module exists in your project
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -59,7 +59,8 @@ def load_config(config_path):
             "database": ["path"],
             "output": ["path"],
             "tickers": [],
-            "date_range": ["start", "end"]
+            "date_range": ["start", "end"],
+            "benchmarks": []
         }
 
         for section, keys in required_keys.items():
@@ -75,63 +76,135 @@ def load_config(config_path):
         logging.error(f"Error loading or validating configuration: {e}")
         raise
 
-def calculate_metrics_and_generate_output(db_path, output_path):
+def calculate_metrics(df, risk_free_rate=0.02):
     """
-    Process the validated database, calculate metrics, and generate output JSON.
+    Calculate financial metrics for the given DataFrame.
 
     Parameters:
-        db_path (str): Path to the SQLite database.
-        output_path (str): Path to save the output JSON file.
+        df (DataFrame): DataFrame containing 'date' and 'close' columns.
+        risk_free_rate (float): Risk-free rate for calculations.
+
+    Returns:
+        dict: Calculated metrics.
     """
-    conn = sqlite3.connect(db_path)
-    try:
-        # Fetch data for metrics calculations
-        query = "SELECT ticker, date, open, close FROM data;"
-        df = pd.read_sql_query(query, conn)
+    # Ensure 'date' is datetime and sort by date
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values('date')
 
-        # Example metric calculations (replace with real logic)
-        cagr = 0.15
-        volatility = 0.12
-        sharpe_ratio = 1.25
-        alpha = 0.05
-        beta = 0.9
+    # Calculate daily returns
+    df['returns'] = df['close'].pct_change().dropna()
 
-        results = {
-            "CAGR": cagr,
-            "Volatility": volatility,
-            "Sharpe Ratio": sharpe_ratio,
-            "Alpha": alpha,
-            "Beta": beta
-        }
+    # Calculate metrics
+    cagr = calculate_cagr(df)
+    volatility = calculate_volatility(df)
+    sharpe_ratio = calculate_sharpe_ratio(df, risk_free_rate)
+    max_drawdown = calculate_max_drawdown(df)
+    sortino_ratio = calculate_sortino_ratio(df, risk_free_rate)
 
-        # Save results to output JSON
-        Outputs.generate_json(results, output_path)
-        logging.info(f"Results successfully saved to {output_path}.")
-    except Exception as e:
-        logging.error(f"Error calculating metrics or generating output: {e}")
-    finally:
-        conn.close()
-
-if __name__ == "__main__":
-    # Load configuration
-    CONFIG_PATH = "config/config.yaml"
-    config = load_config(CONFIG_PATH)
-
-    # Extract paths and schema
-    DB_PATH = config['database']['path']
-    OUTPUT_PATH = config['output']['path']
-    REQUIRED_SCHEMA = {
-        "data": {
-            "ticker": "TEXT",
-            "date": "TEXT",
-            "open": "REAL",
-            "close": "REAL"
-        }
+    return {
+        "CAGR": cagr,
+        "Volatility": volatility,
+        "Sharpe Ratio": sharpe_ratio,
+        "Max Drawdown": max_drawdown,
+        "Sortino Ratio": sortino_ratio
     }
 
-    # Validate database
-    try:
-        validate_database(DB_PATH, REQUIRED_SCHEMA)
-        calculate_metrics_and_generate_output(DB_PATH, OUTPUT_PATH)
-    except ValueError as e:
-        logging.error(f"Pipeline execution failed: {e}")
+def calculate_cagr(df):
+    """
+    Calculate Compound Annual Growth Rate (CAGR).
+
+    Parameters:
+        df (DataFrame): DataFrame containing 'date' and 'close' columns.
+
+    Returns:
+        float: CAGR value.
+    """
+    n_years = (df['date'].iloc[-1] - df['date'].iloc[0]).days / 365.25
+    cagr = (df['close'].iloc[-1] / df['close'].iloc[0]) ** (1 / n_years) - 0.02
+    return cagr
+
+def calculate_volatility(df):
+    """
+    Calculate annualized volatility.
+
+    Parameters:
+        df (DataFrame): DataFrame containing 'returns' column.
+
+    Returns:
+        float: Annualized volatility.
+    """
+    return df['returns'].std() * (252 ** 0.5)
+
+def calculate_sharpe_ratio(df, risk_free_rate):
+    """
+    Calculate Sharpe Ratio.
+
+    Parameters:
+        df (DataFrame): DataFrame containing 'returns' column.
+        risk_free_rate (float): Risk-free rate for calculations.
+
+    Returns:
+        float: Sharpe Ratio.
+    """
+    excess_return = df['returns'].mean() - risk_free_rate / 252
+    return (excess_return / df['returns'].std()) * (252 ** 0.5)
+
+def calculate_max_drawdown(df):
+    """
+    Calculate Maximum Drawdown (MDD).
+
+    Parameters:
+        df (DataFrame): DataFrame containing 'close' column.
+
+    Returns:
+        float: Maximum Drawdown as a percentage.
+    """
+    cumulative = (1 + df['returns']).cumprod()
+    rolling_max = cumulative.cummax()
+    drawdown = (cumulative - rolling_max) / rolling_max
+    return drawdown.min() * 100
+
+def calculate_sortino_ratio(df, risk_free_rate):
+    """
+    Calculate Sortino Ratio.
+
+    Parameters:
+        df (DataFrame): DataFrame containing 'returns' column.
+        risk_free_rate (float): Risk-free rate for calculations.
+
+    Returns:
+        float: Sortino Ratio.
+    """
+    negative_returns = df['returns'][df['returns'] < 0]
+    downside_deviation = negative_returns.std() * (252 ** 0.5)
+    excess_return = df['returns'].mean() - risk_free_rate / 252
+    return (excess_return / downside_deviation) * (252 ** 0.5)
+
+def compare_with_benchmark(df, benchmark_df):
+    """
+    Compare strategy metrics with benchmark metrics.
+
+    Parameters:
+        df (DataFrame): DataFrame containing strategy 'returns'.
+        benchmark_df (DataFrame): DataFrame containing benchmark 'returns'.
+
+    Returns:
+        dict: Comparison metrics.
+    """
+    strategy_metrics = calculate_metrics(df)
+    benchmark_metrics = calculate_metrics(benchmark_df)
+
+    comparison = {
+        "Strategy": strategy_metrics,
+        "Benchmark": benchmark_metrics,
+        "Alpha": strategy_metrics["CAGR"] - benchmark_metrics["CAGR"],
+        "Beta": df['returns'].cov(benchmark_df['returns']) / benchmark_df['returns'].var()
+    }
+
+    return comparison
+
+def calculate_metrics_and_generate_output(db_path, output_path, tickers, date_range, benchmarks):
+    """
+    Process the validated database
+::contentReference[oaicite:0]{index=0}
+ 
