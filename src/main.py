@@ -1,6 +1,8 @@
 import sqlite3
 import logging
 import yaml
+import pandas as pd
+from outputs import Outputs
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -73,6 +75,43 @@ def load_config(config_path):
         logging.error(f"Error loading or validating configuration: {e}")
         raise
 
+def calculate_metrics_and_generate_output(db_path, output_path):
+    """
+    Process the validated database, calculate metrics, and generate output JSON.
+
+    Parameters:
+        db_path (str): Path to the SQLite database.
+        output_path (str): Path to save the output JSON file.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        # Fetch data for metrics calculations
+        query = "SELECT ticker, date, open, close FROM data;"
+        df = pd.read_sql_query(query, conn)
+
+        # Example metric calculations (replace with real logic)
+        cagr = 0.15
+        volatility = 0.12
+        sharpe_ratio = 1.25
+        alpha = 0.05
+        beta = 0.9
+
+        results = {
+            "CAGR": cagr,
+            "Volatility": volatility,
+            "Sharpe Ratio": sharpe_ratio,
+            "Alpha": alpha,
+            "Beta": beta
+        }
+
+        # Save results to output JSON
+        Outputs.generate_json(results, output_path)
+        logging.info(f"Results successfully saved to {output_path}.")
+    except Exception as e:
+        logging.error(f"Error calculating metrics or generating output: {e}")
+    finally:
+        conn.close()
+
 if __name__ == "__main__":
     # Load configuration
     CONFIG_PATH = "config/config.yaml"
@@ -80,6 +119,7 @@ if __name__ == "__main__":
 
     # Extract paths and schema
     DB_PATH = config['database']['path']
+    OUTPUT_PATH = config['output']['path']
     REQUIRED_SCHEMA = {
         "data": {
             "ticker": "TEXT",
@@ -92,6 +132,6 @@ if __name__ == "__main__":
     # Validate database
     try:
         validate_database(DB_PATH, REQUIRED_SCHEMA)
+        calculate_metrics_and_generate_output(DB_PATH, OUTPUT_PATH)
     except ValueError as e:
-        logging.error(f"Database validation error: {e}")
-        raise
+        logging.error(f"Pipeline execution failed: {e}")
