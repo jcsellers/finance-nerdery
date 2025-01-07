@@ -1,13 +1,39 @@
-from data_handler import DataHandler
-from metrics import Metrics
-from strategies import Strategies
-from outputs import Outputs
-import yaml
-import argparse
+import sqlite3
 import logging
-import os
+import yaml
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def validate_database(db_path, required_schema):
+    """
+    Validate the database schema against the required schema.
+
+    Parameters:
+        db_path (str): Path to the SQLite database file.
+        required_schema (dict): Expected schema in the format {table_name: {column_name: column_type}}.
+
+    Raises:
+        ValueError: If schema validation fails.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        for table, columns in required_schema.items():
+            cursor.execute(f"PRAGMA table_info({table});")
+            schema = {row[1]: row[2].upper() for row in cursor.fetchall()}
+            for column, dtype in columns.items():
+                if column not in schema:
+                    raise ValueError(f"Table '{table}' is missing column '{column}'. Please add it.")
+                if dtype != schema[column]:
+                    # Allow 'DATE' as a compatible type for 'TEXT'
+                    if column == "date" and schema[column] == "DATE":
+                        logging.warning(f"Column 'date' in table '{table}' has type 'DATE'. Treating as compatible.")
+                        continue
+                    raise ValueError(f"Column '{column}' in table '{table}' has incorrect type. "
+                                     f"Expected '{dtype}', found '{schema[column]}'.")
+        logging.info("Database schema validated successfully.")
+    finally:
+        conn.close()
 
 def load_config(config_path):
     """
@@ -48,55 +74,24 @@ def load_config(config_path):
         raise
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run trading analysis pipeline.")
-    parser.add_argument('--config', type=str, required=True, help="Path to the configuration file (YAML).")
-    args = parser.parse_args()
+    # Load configuration
+    CONFIG_PATH = "config/config.yaml"
+    config = load_config(CONFIG_PATH)
 
+    # Extract paths and schema
+    DB_PATH = config['database']['path']
+    REQUIRED_SCHEMA = {
+        "data": {
+            "ticker": "TEXT",
+            "date": "TEXT",
+            "open": "REAL",
+            "close": "REAL"
+        }
+    }
+
+    # Validate database
     try:
-        # Load and validate configuration
-        config = load_config(args.config)
-
-        db_path = config['database']['path']
-        output_path = config['output']['path']
-        tickers = config['tickers']
-        date_range = config['date_range']
-
-        # Ensure output directory exists
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-        # Initialize DataHandler and validate database
-        data_handler = DataHandler(db_path)
-        required_tables = {
-            "data": {"ticker": "TEXT", "date": "TEXT", "open": "REAL", "close": "REAL"}
-        }
-        data_handler.validate_database(required_tables)
-
-        # Fetch data
-        data = data_handler.fetch_data(tickers, date_range['start'], date_range['end'])
-
-        # Metric calculations
-        cagr = Metrics.calculate_cagr(data)
-        volatility = Metrics.calculate_volatility(data)
-        sharpe = Metrics.calculate_sharpe(data)
-
-        # Strategy calculations
-        strategy_returns = Strategies.buy_and_hold_strategy(data)
-
-        # Alpha and Beta against benchmark (SPY)
-        benchmark_returns = data[data['ticker'] == 'SPY']['close'].pct_change().dropna()
-        alpha, beta = Metrics.calculate_alpha_beta(strategy_returns, benchmark_returns)
-
-        # Generate output
-        results = {
-            "CAGR": cagr,
-            "Volatility": volatility,
-            "Sharpe Ratio": sharpe,
-            "Alpha": alpha,
-            "Beta": beta
-        }
-        Outputs.generate_json(results, output_path)
-
-        logging.info(f"Pipeline completed successfully. Results saved to {output_path}.")
-
-    except Exception as e:
-        logging.error(f"Pipeline execution failed: {e}")
+        validate_database(DB_PATH, REQUIRED_SCHEMA)
+    except ValueError as e:
+        logging.error(f"Database validation error: {e}")
+        raise
