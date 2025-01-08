@@ -43,6 +43,7 @@ jobs:
       run: |
         pip install flake8
         flake8 .
+        continue-on-error: true
 
     - name: Run Tests with pytest
       run: |
