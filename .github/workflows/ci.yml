@@ -13,45 +13,40 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8.17, 3.9.18, 3.10.12]
+        python-version: [3.8, 3.9, 3.10]
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Debug Python Version Before Setup
-      run: python --version || echo "Python not yet set up"
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Clear Python Cache
-      run: rm -rf ~/.pyenv
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        check-latest: true
-
-    - name: Debug Python Version After Setup
-      run: python --version
-
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        flake8 .
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 .
         continue-on-error: true
 
-    - name: Run Tests with pytest
-      run: |
-        pip install pytest pytest-cov
-        pytest --cov=.
+      - name: Run Tests with pytest
+        if: always()
+        run: |
+          pip install pytest pytest-cov
+          pytest --cov=.
 
-    - name: Upload Coverage Report
-      uses: actions/upload-artifact@v3
-      with:
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: ./htmlcov/
+
         name: coverage-report
         path: ./htmlcov/
