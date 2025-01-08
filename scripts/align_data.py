@@ -16,10 +16,12 @@ ALIGNED_DIR = "../data/aligned"
 START_DATE = "1990-01-02"
 END_DATE = "2025-01-03"
 
+
 def align_datasets():
+    """Align datasets in the cleaned directory to a common date range."""
     # Ensure aligned directory exists
     os.makedirs(ALIGNED_DIR, exist_ok=True)
-    
+
     # Get all cleaned files
     files = [f for f in os.listdir(CLEANED_DIR) if f.endswith("_cleaned.csv")]
     common_dates = pd.date_range(start=START_DATE, end=END_DATE)
@@ -48,11 +50,12 @@ def align_datasets():
             df.rename(columns={'index': 'Date'}, inplace=True)
             aligned_filepath = os.path.join(ALIGNED_DIR, file)
             df.to_csv(aligned_filepath, index=False)
-            
+
             logging.info(f"Aligned and saved: {file}")
-        
+
         except Exception as e:
             logging.error(f"Error aligning {file}: {e}")
+
 
 if __name__ == "__main__":
     logging.info("Starting dataset alignment...")

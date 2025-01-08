@@ -4,13 +4,13 @@ import os
 import logging
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Define the path to the SQLite database
-db_path = '../data/aligned_data.db'
+DB_PATH = "../data/aligned_data.db"
 
 # List of CSV files and their tickers
-datasets = {
+DATASETS = {
     "UPRO": "../data/aligned/UPRO_cleaned.csv",
     "SSO": "../data/aligned/SSO_cleaned.csv",
     "SPY": "../data/aligned/SPY_cleaned.csv",
@@ -23,20 +23,23 @@ datasets = {
 }
 
 # Default columns and types
-required_columns = {
-    'Date': 'TEXT',
-    'Open': 'REAL',
-    'Close': 'REAL',
-    'High': 'REAL',
-    'Low': 'REAL',
-    'Volume': 'INTEGER',
+REQUIRED_COLUMNS = {
+    "Date": "TEXT",
+    "Open": "REAL",
+    "Close": "REAL",
+    "High": "REAL",
+    "Low": "REAL",
+    "Volume": "INTEGER",
 }
+
 
 def create_and_populate_unified_table(db_path, datasets):
     """
     Create a unified SQLite database table and populate it with data from CSV files.
-    :param db_path: Path to the SQLite database.
-    :param datasets: Dictionary with tickers as keys and CSV file paths as values.
+
+    Parameters:
+        db_path (str): Path to the SQLite database.
+        datasets (dict): Dictionary with tickers as keys and CSV file paths as values.
     """
     try:
         conn = sqlite3.connect(db_path)
@@ -44,14 +47,16 @@ def create_and_populate_unified_table(db_path, datasets):
         logging.info(f"Connected to SQLite database at {db_path}")
 
         # Create the unified `data` table
-        columns_definition = ", ".join([f"{col} {col_type}" for col, col_type in required_columns.items()])
-        cursor.execute(f'''
+        columns_definition = ", ".join([f"{col} {col_type}" for col, col_type in REQUIRED_COLUMNS.items()])
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS data (
                 ticker TEXT NOT NULL,
                 {columns_definition},
                 PRIMARY KEY (ticker, Date)
             )
-        ''')
+            """
+        )
         logging.info("Table 'data' created.")
 
         # Populate the `data` table
@@ -64,18 +69,18 @@ def create_and_populate_unified_table(db_path, datasets):
                 df = pd.read_csv(csv_path)
 
                 # Ensure required columns are present
-                for col in required_columns:
+                for col in REQUIRED_COLUMNS:
                     if col not in df.columns:
                         logging.warning(f"Column '{col}' missing in {csv_path}. Filling with default values.")
-                        default_value = 0 if required_columns[col] in ['REAL', 'INTEGER'] else None
+                        default_value = 0 if REQUIRED_COLUMNS[col] in ["REAL", "INTEGER"] else None
                         df[col] = default_value
 
                 # Add ticker column and process dates
-                df['ticker'] = ticker
-                df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d')
+                df["ticker"] = ticker
+                df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d")
 
                 # Write to the database
-                df.to_sql('data', conn, if_exists='append', index=False)
+                df.to_sql("data", conn, if_exists="append", index=False)
                 logging.info(f"Data for '{ticker}' added to 'data' table.")
             except Exception as e:
                 logging.error(f"Error processing {csv_path}: {e}")
@@ -87,7 +92,7 @@ def create_and_populate_unified_table(db_path, datasets):
         conn.close()
         logging.info("Database connection closed.")
 
+
 # Execute the script
 if __name__ == "__main__":
-    create_and_populate_unified_table(db_path, datasets)
-
+    create_and_populate_unified_table(DB_PATH, DATASETS)
