@@ -16,17 +16,22 @@ jobs:
         python-version: [3.8.17, 3.9.18, 3.10.12]
 
     steps:
+      - name: Print Environment Variables
+        run: env
+
       - name: Debug Matrix Values
-        run: echo "Python version: ${{ matrix.python-version }}"
+        run: echo "Using Python version: ${{ matrix.python-version }}"
 
       - name: Clear Python Cache
         run: rm -rf ~/.pyenv
 
+      - name: Python Version Before Setup
+        run: python --version || echo "Python not installed yet"
+
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4.5.0
         with:
           python-version: ${{ matrix.python-version }}
-          check-latest: true
 
       - name: Install Dependencies
         run: |
