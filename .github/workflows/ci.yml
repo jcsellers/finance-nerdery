@@ -13,14 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8, 3.9, 3.10]
+        python-version: [3.8.17, 3.9.18, 3.10.12]
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    - name: Debug Python Version
-      run: echo "Using Python version ${{ matrix.python-version }}"
+    - name: Debug Python Version Before Setup
+      run: python --version || echo "Python not yet set up"
 
     - name: Clear Python Cache
       run: rm -rf ~/.pyenv
@@ -30,6 +30,9 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         check-latest: true
+
+    - name: Debug Python Version After Setup
+      run: python --version
 
     - name: Install Dependencies
       run: |
@@ -41,4 +44,13 @@ jobs:
         pip install flake8
         flake8 .
 
-    - name: Ru
+    - name: Run Tests with pytest
+      run: |
+        pip install pytest pytest-cov
+        pytest --cov=.
+
+    - name: Upload Coverage Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: ./htmlcov/
