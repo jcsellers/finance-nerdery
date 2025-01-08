@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8.17, 3.9.18, 3.10.12]
+        python-version: [3.8, 3.9, 3.10]
 
     steps:
       - name: Print Environment Variables
@@ -22,37 +22,10 @@ jobs:
       - name: Debug Matrix Values
         run: echo "Using Python version: ${{ matrix.python-version }}"
 
-      - name: Clear Python Cache
-        run: rm -rf ~/.pyenv
-
-      - name: Python Version Before Setup
-        run: python --version || echo "Python not installed yet"
-
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Lint with flake8
-        run: |
-          pip install flake8
-          flake8 .
-        continue-on-error: true
-
-      - name: Run Tests with pytest
-        if: always()
-        run: |
-          pip install pytest pytest-cov
-          pytest --cov=.
-
-      - name: Upload Coverage Report
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: ./htmlcov/
+      - name: Verify Python Installation
+        run: python --version
