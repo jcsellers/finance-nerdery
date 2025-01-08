@@ -45,9 +45,3 @@ jobs:
         with:
           name: coverage-report
           path: ./htmlcov/
-
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Verify Python Installation
-        run: python --version
