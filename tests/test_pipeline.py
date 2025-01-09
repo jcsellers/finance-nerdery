@@ -63,6 +63,7 @@ def test_generate_cash_dataset():
     assert "Date" in df.columns and "Value" in df.columns
 
 
+# Test align_datasets
 def test_align_datasets(setup_test_environment):
     # Create mock cleaned data
     dates = pd.date_range(start="2023-01-01", end="2023-01-10")
@@ -85,7 +86,7 @@ def test_align_datasets(setup_test_environment):
     assert os.path.exists(aligned_file)
 
 
-# Test database population
+# Test create_and_populate_unified_table
 def test_create_sqlite_db(setup_test_environment):
     # Create a test aligned dataset
     dates = pd.date_range(start="2023-01-01", end="2023-01-10")
