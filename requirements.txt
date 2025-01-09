@@ -11,4 +11,3 @@ fredapi
 black
 isort
 python-dotenv
-sqlite3
