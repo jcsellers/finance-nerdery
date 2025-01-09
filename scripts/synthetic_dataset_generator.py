@@ -1,54 +1,63 @@
-import sqlite3
 import os
-from datetime import datetime
-from database_utils import save_to_database
-from data_generation import generate_linear_trend, generate_cash_asset
+import pandas as pd
+import logging
 
-# Database Path
-DATABASE_PATH = "../data/aligned/trading_database.db"
+# Paths
+ALIGNED_DIR = "../data/aligned"
 
-def initialize_database(database_path):
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+def generate_linear_trend():
     """
-    Initialize the SQLite database with the required schema and UNIQUE constraint.
+    Generate a synthetic dataset with a linear trend.
     """
-    os.makedirs(os.path.dirname(database_path), exist_ok=True)
-    with sqlite3.connect(database_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS prices (
-                timestamp TEXT,
-                ticker TEXT,
-                open REAL,
-                high REAL,
-                low REAL,
-                close REAL,
-                volume REAL,
-                UNIQUE(ticker, timestamp)
-            );
-            """
-        )
+    dates = pd.date_range(start="1990-01-02", end="2025-01-03", freq="D")
+    values = [i * 0.1 for i in range(len(dates))]
+    df = pd.DataFrame({"Date": dates, "Value": values})
+    return df
+
+def generate_cash_dataset():
+    """
+    Generate a synthetic dataset with a constant value (cash).
+    """
+    dates = pd.date_range(start="1990-01-02", end="2025-01-03", freq="D")
+    values = [100] * len(dates)
+    df = pd.DataFrame({"Date": dates, "Value": values})
+    return df
 
 def main():
     """
-    Main function to generate synthetic datasets and integrate them into the database.
+    Generate synthetic datasets and save them to the aligned directory.
     """
-    # Initialize the database
-    initialize_database(DATABASE_PATH)
+    os.makedirs(ALIGNED_DIR, exist_ok=True)
 
     # Generate synthetic datasets
-    print("Generating synthetic datasets...")
-    start_date = datetime(1990, 1, 2)
-    days = (datetime.now() - start_date).days
+    df_linear = generate_linear_trend()
+    df_cash = generate_cash_dataset()
 
-    synthetic_linear = generate_linear_trend(100, start_date, days, ticker="SYN_LINEAR")
-    synthetic_cash = generate_cash_asset(150000, start_date, days, ticker="SYN_CASH")
+    # Add ticker column
+    df_linear["ticker"] = "SYN_LINEAR"
+    df_cash["ticker"] = "SYN_CASH"
 
-    # Save synthetic data to database
-    print(f"Saving synthetic datasets: {len(synthetic_linear)} rows for SYN_LINEAR, {len(synthetic_cash)} rows for SYN_CASH...")
-    save_to_database(synthetic_linear, DATABASE_PATH)
-    save_to_database(synthetic_cash, DATABASE_PATH)
+    # Map Value to the expected schema
+    for df in [df_linear, df_cash]:
+        df["Open"] = df["Value"]
+        df["Close"] = df["Value"]
+        df["High"] = df["Value"]
+        df["Low"] = df["Value"]
+        df["Volume"] = 0  # Default value for Volume
+        df.drop(columns=["Value"], inplace=True)
 
-    print(f"Synthetic datasets integrated into the database at {DATABASE_PATH}.")
+    # Save synthetic datasets
+    linear_path = os.path.join(ALIGNED_DIR, "SYN_LINEAR_cleaned.csv")
+    cash_path = os.path.join(ALIGNED_DIR, "SYN_CASH_cleaned.csv")
 
-if __name__ == "__main
+    df_linear.to_csv(linear_path, index=False)
+    logging.info(f"Saved synthetic dataset: {linear_path}")
+
+    df_cash.to_csv(cash_path, index=False)
+    logging.info(f"Saved synthetic dataset: {cash_path}")
+
+if __name__ == "__main__":
+    main()
