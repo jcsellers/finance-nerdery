@@ -27,3 +27,6 @@ jobs:
 
       - name: Run Synthetic Data Tests
         run: pytest tests/test_synthetic_data.py -v
+
+      - name: Run all tests
+        run: pytest tests/
