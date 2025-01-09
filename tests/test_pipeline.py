@@ -2,6 +2,7 @@ import os
 from unittest.mock import patch
 
 import pandas as pd
+import sqlite3
 import pytest
 from align_data import align_datasets
 from create_sqlite_db import create_and_populate_unified_table
