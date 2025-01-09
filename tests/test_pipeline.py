@@ -7,7 +7,8 @@ import pytest
 from align_data import align_datasets
 from create_sqlite_db import create_and_populate_unified_table
 from fetch_fred_data import fetch_fred_data
-from synthetic_dataset_generator import generate_cash_dataset, generate_linear_trend
+from synthetic_dataset_generator import (generate_cash_dataset,
+                                         generate_linear_trend)
 
 # Test Constants
 TEST_DB_PATH = "test_output/test_aligned_data.db"
