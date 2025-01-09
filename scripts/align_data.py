@@ -1,63 +1,47 @@
-import pandas as pd
 import os
+import pandas as pd
 import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Directories
-CLEANED_DIR = "../data/cleaned"
-ALIGNED_DIR = "../data/aligned"
+def align_datasets(input_dir="../data/cleaned", output_dir="../data/aligned"):
+    """
+    Align datasets in the input directory to a common date range and save to the output directory.
 
-# Alignment range
-START_DATE = "1990-01-02"
-END_DATE = "2025-01-03"
+    Parameters:
+        input_dir (str): Path to the directory containing cleaned data.
+        output_dir (str): Path to the directory to save aligned data.
+    """
+    os.makedirs(output_dir, exist_ok=True)
 
-
-def align_datasets():
-    """Align datasets in the cleaned directory to a common date range."""
-    # Ensure aligned directory exists
-    os.makedirs(ALIGNED_DIR, exist_ok=True)
-
-    # Get all cleaned files
-    files = [f for f in os.listdir(CLEANED_DIR) if f.endswith("_cleaned.csv")]
-    common_dates = pd.date_range(start=START_DATE, end=END_DATE)
+    files = [f for f in os.listdir(input_dir) if f.endswith(".csv")]
+    common_dates = pd.date_range(start="1990-01-02", end="2025-01-03")
 
     for file in files:
         try:
-            # Load data
-            filepath = os.path.join(CLEANED_DIR, file)
+            filepath = os.path.join(input_dir, file)
             df = pd.read_csv(filepath)
 
-            # Ensure 'Date' is datetime
+            # Ensure 'Date' is datetime and set as index
             df['Date'] = pd.to_datetime(df['Date'])
-
-            # Set 'Date' as index for alignment
             df.set_index('Date', inplace=True)
 
-            # Reindex to the common date range
+            # Reindex and fill missing values
             df = df.reindex(common_dates)
-
-            # Forward-fill and backward-fill missing data
             df.ffill(inplace=True)
             df.bfill(inplace=True)
 
             # Reset index and save the aligned dataset
             df.reset_index(inplace=True)
             df.rename(columns={'index': 'Date'}, inplace=True)
-            aligned_filepath = os.path.join(ALIGNED_DIR, file)
-            df.to_csv(aligned_filepath, index=False)
 
-            logging.info(f"Aligned and saved: {file}")
+            # Append `_cleaned` to the output filename
+            base_filename = os.path.splitext(file)[0]
+            aligned_filepath = os.path.join(output_dir, f"{base_filename}_cleaned.csv")
+            df.to_csv(aligned_filepath, index=False)
+            logging.info(f"Aligned and saved: {aligned_filepath}")
 
         except Exception as e:
             logging.error(f"Error aligning {file}: {e}")
 
-
-if __name__ == "__main__":
-    logging.info("Starting dataset alignment...")
-    align_datasets()
-    logging.info("Dataset alignment completed.")

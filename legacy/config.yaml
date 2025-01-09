@@ -1,0 +1,17 @@
+database:
+  path: "../data/aligned/trading_database.db"  # Centralized database path
+output:
+  path: "../data/results.json"
+tickers:
+  - "SPY"
+  - "UPRO"
+  - "SSO"
+  - "TLT"
+  - "GLD"
+  - "^SPX"
+  - "^VIX"
+  - "DGS10"
+  - "BAMLH0A0HYM2"
+date_range:
+  start: "1990-01-02"  # Start date for analysis
+  end: null  # Use `null` to dynamically set the current date
