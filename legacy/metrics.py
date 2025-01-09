@@ -1,8 +1,12 @@
-import numpy as np
-import statsmodels.api as sm
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+import numpy as np
+import statsmodels.api as sm
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 class Metrics:
     @staticmethod
@@ -18,11 +22,13 @@ class Metrics:
             float: Sortino Ratio.
         """
         try:
-            returns = df['close'].pct_change().dropna()
+            returns = df["close"].pct_change().dropna()
             excess_returns = returns.mean() * 252 - risk_free_rate
             downside_deviation = np.sqrt(252) * np.std(returns[returns < 0])
             if downside_deviation == 0:
-                logging.warning("Downside deviation is zero; Sortino Ratio is undefined.")
+                logging.warning(
+                    "Downside deviation is zero; Sortino Ratio is undefined."
+                )
                 return None
             return excess_returns / downside_deviation
         except Exception as e:
@@ -41,7 +47,7 @@ class Metrics:
             float: Maximum Drawdown as a percentage.
         """
         try:
-            cumulative = (1 + df['close'].pct_change()).cumprod()
+            cumulative = (1 + df["close"].pct_change()).cumprod()
             rolling_max = cumulative.cummax()
             drawdown = (cumulative - rolling_max) / rolling_max
             return drawdown.min() * 100
@@ -87,7 +93,9 @@ class Metrics:
             active_returns = strategy_returns - benchmark_returns
             tracking_error = np.std(active_returns)
             if tracking_error == 0:
-                logging.warning("Tracking error is zero; Information Ratio is undefined.")
+                logging.warning(
+                    "Tracking error is zero; Information Ratio is undefined."
+                )
                 return None
             return np.mean(active_returns) / tracking_error
         except Exception as e:
@@ -130,7 +138,7 @@ class Metrics:
             float: Value at Risk as a negative percentage.
         """
         try:
-            returns = df['close'].pct_change().dropna()
+            returns = df["close"].pct_change().dropna()
             return np.percentile(returns, (1 - confidence_level) * 100) * 100
         except Exception as e:
             logging.error(f"Error calculating Value at Risk: {e}")
@@ -149,7 +157,7 @@ class Metrics:
             float: Conditional Value at Risk as a negative percentage.
         """
         try:
-            returns = df['close'].pct_change().dropna()
+            returns = df["close"].pct_change().dropna()
             var = np.percentile(returns, (1 - confidence_level) * 100)
             return returns[returns <= var].mean() * 100
         except Exception as e:
@@ -168,9 +176,9 @@ class Metrics:
             float: The CAGR value.
         """
         try:
-            start_value = df['close'].iloc[0]
-            end_value = df['close'].iloc[-1]
-            num_years = (df['date'].iloc[-1] - df['date'].iloc[0]).days / 365.25
+            start_value = df["close"].iloc[0]
+            end_value = df["close"].iloc[-1]
+            num_years = (df["date"].iloc[-1] - df["date"].iloc[0]).days / 365.25
             return (end_value / start_value) ** (1 / num_years) - 1
         except Exception as e:
             logging.error(f"Error calculating CAGR: {e}")

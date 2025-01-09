@@ -1,5 +1,6 @@
 import sqlite3
 
+
 def save_to_database(dataframe, database_path):
     """
     Saves a DataFrame to the SQLite database.

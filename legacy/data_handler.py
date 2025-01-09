@@ -1,8 +1,12 @@
-import sqlite3
-import pandas as pd
 import logging
+import sqlite3
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+import pandas as pd
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 class DataHandler:
     def __init__(self, db_path):
@@ -24,9 +28,11 @@ class DataHandler:
                 SELECT * FROM prices 
                 WHERE ticker IN ({}) 
                 AND timestamp BETWEEN ? AND ?;
-            """.format(','.join(['?'] * len(tickers)))
+            """.format(
+                ",".join(["?"] * len(tickers))
+            )
             df = pd.read_sql_query(query, conn, params=tickers + [start_date, end_date])
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
             return df
         except Exception as e:
             logging.error(f"Error fetching data: {e}")

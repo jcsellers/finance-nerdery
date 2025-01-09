@@ -1,11 +1,14 @@
-import yaml
 from datetime import datetime
+
+import yaml
 from data_handler import DataHandler
 from database_validation import validate_database
+
 
 def load_config(config_path="config.yaml"):
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
+
 
 def get_date_range(config):
     start_date = config["date_range"]["start"]
@@ -13,6 +16,7 @@ def get_date_range(config):
     if end_date is None:
         end_date = datetime.now().strftime("%Y-%m-%d")
     return start_date, end_date
+
 
 def main():
     # Load configuration
@@ -32,6 +36,6 @@ def main():
 
     # Additional logic here...
 
+
 if __name__ == "__main__":
     main()
-

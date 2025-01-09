@@ -1,10 +1,14 @@
-import sqlite3
-import os
-import pandas as pd
 import logging
+import os
+import sqlite3
+
+import pandas as pd
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 def create_and_populate_unified_table(db_path, datasets):
     """
@@ -25,7 +29,8 @@ def create_and_populate_unified_table(db_path, datasets):
         logging.info(f"Connected to SQLite database at {db_path}")
 
         # Create the unified `data` table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS data (
                 ticker TEXT NOT NULL,
                 Date TEXT NOT NULL,
@@ -36,7 +41,8 @@ def create_and_populate_unified_table(db_path, datasets):
                 Volume INTEGER,
                 PRIMARY KEY (ticker, Date)
             )
-        """)
+        """
+        )
         logging.info("Table 'data' created.")
 
         # Populate the `data` table
@@ -51,7 +57,9 @@ def create_and_populate_unified_table(db_path, datasets):
                 # Ensure required columns are present
                 for col in ["High", "Low", "Volume"]:
                     if col not in df.columns:
-                        logging.warning(f"Column '{col}' missing in {file_path}. Filling with default values.")
+                        logging.warning(
+                            f"Column '{col}' missing in {file_path}. Filling with default values."
+                        )
                         df[col] = 0  # Default value
 
                 # Remove duplicates
@@ -64,10 +72,21 @@ def create_and_populate_unified_table(db_path, datasets):
                 # Insert rows into the database, handling duplicates with REPLACE INTO
                 for _, row in df.iterrows():
                     try:
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             INSERT OR REPLACE INTO data (ticker, Date, Open, Close, High, Low, Volume)
                             VALUES (?, ?, ?, ?, ?, ?, ?);
-                        """, (row["ticker"], row["Date"], row["Open"], row["Close"], row["High"], row["Low"], row["Volume"]))
+                        """,
+                            (
+                                row["ticker"],
+                                row["Date"],
+                                row["Open"],
+                                row["Close"],
+                                row["High"],
+                                row["Low"],
+                                row["Volume"],
+                            ),
+                        )
                     except sqlite3.Error as e:
                         logging.error(f"Error inserting row for {ticker}: {e}")
 
@@ -89,4 +108,3 @@ def create_and_populate_unified_table(db_path, datasets):
         if conn:
             conn.close()
             logging.info("Database connection closed.")
-

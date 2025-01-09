@@ -1,12 +1,16 @@
-import os
-import pandas as pd
 import logging
+import os
+
+import pandas as pd
 
 # Paths
 ALIGNED_DIR = "../data/aligned"
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 def generate_linear_trend():
     """
@@ -17,6 +21,7 @@ def generate_linear_trend():
     df = pd.DataFrame({"Date": dates, "Value": values})
     return df
 
+
 def generate_cash_dataset():
     """
     Generate a synthetic dataset with a constant value (cash).
@@ -25,6 +30,7 @@ def generate_cash_dataset():
     values = [100] * len(dates)
     df = pd.DataFrame({"Date": dates, "Value": values})
     return df
+
 
 def main():
     """
@@ -58,6 +64,7 @@ def main():
 
     df_cash.to_csv(cash_path, index=False)
     logging.info(f"Saved synthetic dataset: {cash_path}")
+
 
 if __name__ == "__main__":
     main()

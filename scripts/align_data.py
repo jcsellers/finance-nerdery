@@ -1,9 +1,13 @@
-import os
-import pandas as pd
 import logging
+import os
+
+import pandas as pd
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 def align_datasets(input_dir="../data/cleaned", output_dir="../data/aligned"):
     """
@@ -24,8 +28,8 @@ def align_datasets(input_dir="../data/cleaned", output_dir="../data/aligned"):
             df = pd.read_csv(filepath)
 
             # Ensure 'Date' is datetime and set as index
-            df['Date'] = pd.to_datetime(df['Date'])
-            df.set_index('Date', inplace=True)
+            df["Date"] = pd.to_datetime(df["Date"])
+            df.set_index("Date", inplace=True)
 
             # Reindex and fill missing values
             df = df.reindex(common_dates)
@@ -34,7 +38,7 @@ def align_datasets(input_dir="../data/cleaned", output_dir="../data/aligned"):
 
             # Reset index and save the aligned dataset
             df.reset_index(inplace=True)
-            df.rename(columns={'index': 'Date'}, inplace=True)
+            df.rename(columns={"index": "Date"}, inplace=True)
 
             # Append `_cleaned` to the output filename
             base_filename = os.path.splitext(file)[0]
@@ -44,4 +48,3 @@ def align_datasets(input_dir="../data/cleaned", output_dir="../data/aligned"):
 
         except Exception as e:
             logging.error(f"Error aligning {file}: {e}")
-

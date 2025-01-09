@@ -1,9 +1,13 @@
 import json
 import logging
-from jsonschema import validate, ValidationError
 import os
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from jsonschema import ValidationError, validate
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 class Outputs:
     @staticmethod
@@ -27,9 +31,9 @@ class Outputs:
                 "Alpha": {"type": ["number", "null"]},
                 "Beta": {"type": ["number", "null"]},
                 "Max Drawdown": {"type": ["number", "null"], "default": None},
-                "Win Rate": {"type": ["number", "null"], "default": None}
+                "Win Rate": {"type": ["number", "null"], "default": None},
             },
-            "required": ["CAGR", "Volatility", "Sharpe Ratio"]
+            "required": ["CAGR", "Volatility", "Sharpe Ratio"],
         }
 
         try:
@@ -40,12 +44,14 @@ class Outputs:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
             # Write the results to the specified JSON file
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 json.dump(results, f, indent=4)
             logging.info(f"Results successfully written to {output_path}.")
         except ValidationError as e:
             logging.error(f"Validation error: {e.message}")
-            raise ValueError("Results dictionary does not conform to the required schema.")
+            raise ValueError(
+                "Results dictionary does not conform to the required schema."
+            )
         except Exception as e:
             logging.error(f"Error generating output: {e}")
             raise

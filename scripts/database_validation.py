@@ -1,5 +1,6 @@
-import sqlite3
 import logging
+import sqlite3
+
 
 def validate_database(db_path):
     """
@@ -11,7 +12,9 @@ def validate_database(db_path):
     Returns:
         bool: True if validation is successful, raises an exception otherwise.
     """
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
 
     expected_schema = {
         "prices": [
@@ -38,11 +41,17 @@ def validate_database(db_path):
             # Validate columns
             for expected_column in expected_columns:
                 match = next(
-                    (col for col in actual_columns if col[1] == expected_column["name"]),
+                    (
+                        col
+                        for col in actual_columns
+                        if col[1] == expected_column["name"]
+                    ),
                     None,
                 )
                 if not match:
-                    raise ValueError(f"Missing column '{expected_column['name']}' in table '{table}'.")
+                    raise ValueError(
+                        f"Missing column '{expected_column['name']}' in table '{table}'."
+                    )
                 if match[2].upper() != expected_column["type"].upper():
                     raise ValueError(
                         f"Column '{expected_column['name']}' in table '{table}' has incorrect type. "
@@ -53,6 +62,7 @@ def validate_database(db_path):
 
     logging.info("Database validation successful.")
     return True
+
 
 if __name__ == "__main__":
     db_path = "../data/aligned/trading_database.db"  # Update path if needed

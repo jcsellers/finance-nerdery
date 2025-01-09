@@ -1,19 +1,23 @@
-import os
-from fredapi import Fred
-import pandas as pd
 import logging
+import os
+
+import pandas as pd
 from dotenv import load_dotenv
+from fredapi import Fred
 
 # Load environment variables
 load_dotenv()
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 FRED_API_KEY = os.getenv("FRED_API_KEY")
 
 if not FRED_API_KEY:
     raise ValueError("FRED_API_KEY is not set. Please check your .env file.")
+
 
 def fetch_fred_data(fred_symbols, output_dir="../data/economic"):
     """
@@ -41,13 +45,16 @@ def fetch_fred_data(fred_symbols, output_dir="../data/economic"):
             df["High"] = df["Value"]
             df["Low"] = df["Value"]
             df["Volume"] = 0  # Default value for Volume
-            df = df[["Date", "Open", "Close", "High", "Low", "Volume"]]  # Reorder columns
+            df = df[
+                ["Date", "Open", "Close", "High", "Low", "Volume"]
+            ]  # Reorder columns
 
             filepath = os.path.join(output_dir, f"{symbol}.csv")
             df.to_csv(filepath, index=False)
             logging.info(f"Saved FRED series: {symbol} to {filepath}")
         except Exception as e:
             logging.error(f"Error fetching FRED series {symbol}: {e}")
+
 
 if __name__ == "__main__":
     # Example usage

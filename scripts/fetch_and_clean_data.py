@@ -1,14 +1,18 @@
+import logging
 import os
+
 import pandas as pd
 import yfinance as yf
-import logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # Define directories for raw and cleaned data
 RAW_DIR = "../data/raw"
 CLEAN_DIR = "../data/cleaned"
+
 
 def clean_yfinance_data(file_path, ticker):
     """
@@ -33,6 +37,7 @@ def clean_yfinance_data(file_path, ticker):
         logging.error(f"Error cleaning data for {ticker}: {e}")
         return None
 
+
 def fetch_and_clean(tickers):
     """
     Fetch and clean data for a given list of tickers.
@@ -56,4 +61,3 @@ def fetch_and_clean(tickers):
                 logging.info(f"Cleaned data saved to: {clean_path}")
         except Exception as e:
             logging.error(f"Error fetching or cleaning data for {ticker}: {e}")
-

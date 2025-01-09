@@ -1,6 +1,7 @@
 import yaml
 from database_utils import process_all_csv_files
 
+
 def load_config(config_path="config.yaml"):
     """
     Load configuration from a YAML file.
