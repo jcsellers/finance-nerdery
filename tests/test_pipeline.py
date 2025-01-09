@@ -1,20 +1,20 @@
 import os
-import sqlite3
-from unittest.mock import patch
-
 import pandas as pd
 import pytest
+from unittest.mock import patch
 from align_data import align_datasets
 from create_sqlite_db import create_and_populate_unified_table
 from fetch_fred_data import fetch_fred_data
-from synthetic_dataset_generator import generate_cash_dataset, generate_linear_trend
+from synthetic_dataset_generator import (
+    generate_cash_dataset,
+    generate_linear_trend,
+)
 
 # Test Constants
 TEST_DB_PATH = "test_output/test_aligned_data.db"
 TEST_TICKER_FILE = "test_data/test_ticker_file.csv"
 TEST_ECONOMIC_DIR = "test_data/test_economic"
 TEST_ALIGNED_DIR = "test_data/test_aligned"
-
 
 # Setup and Teardown Fixtures
 @pytest.fixture(scope="function")
@@ -39,11 +39,8 @@ def setup_test_environment():
 
 
 # Test fetch_fred_data
-@patch("fetch_fred_data.Fred.get_series")
-def test_fetch_fred_data(mock_get_series, setup_test_environment):
-    mock_data = pd.Series([1.0, 2.0], index=["2023-01-01", "2023-01-02"])
-    mock_get_series.return_value = mock_data
-
+@patch.dict(os.environ, {"FRED_API_KEY": "test_key"})
+def test_fetch_fred_data(setup_test_environment):
     fred_symbols = ["TEST_FRED"]
     fetch_fred_data(fred_symbols, output_dir=TEST_ECONOMIC_DIR)
 
@@ -113,3 +110,4 @@ def test_create_sqlite_db(setup_test_environment):
     rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
     conn.close()
     assert rows > 0
+
