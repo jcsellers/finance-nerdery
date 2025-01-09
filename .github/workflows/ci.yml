@@ -22,6 +22,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8
 
+      - name: Run isort (Import Sorting)
+        run: isort src tests --check --diff
+
+      - name: Run black (Code Formatter)
+        run: black src tests --check --diff
+
       - name: Run Linting
         run: flake8 src tests
 
