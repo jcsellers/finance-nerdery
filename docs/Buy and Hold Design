@@ -1,0 +1,149 @@
+**Design Document: Buy-and-Hold Strategy Implementation**
+
+### **Overview**
+This document specifies the requirements, inputs, workflow, and outputs for implementing and testing a Buy-and-Hold trading strategy with and without rebalancing.
+
+---
+
+### **1. Objective**
+To simulate a Buy-and-Hold strategy on a portfolio of selected tickers, with optional rebalancing. The implementation will support:
+1. Simple Buy-and-Hold: No rebalancing after the initial purchase.
+2. Buy-and-Hold with Rebalancing: Periodic reallocation to maintain target weights.
+
+---
+
+### **2. Requirements**
+1. **Input Data**:
+   - Historical price data (Open/Close) for selected tickers.
+   - Start and end dates for the simulation.
+   - Initial capital.
+   - Portfolio target allocations (e.g., 60% SPY, 40% TLT).
+   - Optional: Rebalancing frequency (e.g., monthly, quarterly).
+
+2. **Functionality**:
+   - Execute trades to establish initial portfolio.
+   - Track portfolio value over time based on price changes.
+   - Handle periodic rebalancing if enabled.
+   - Calculate and output key performance metrics.
+
+3. **Output**:
+   - Time series of portfolio value.
+   - Allocation history (if rebalancing).
+   - Performance metrics (CAGR, Sharpe ratio, drawdown, volatility).
+
+---
+
+### **3. Workflow**
+
+#### **Step 1: Input Handling**
+- Load historical price data for selected tickers.
+- Validate input parameters (e.g., allocations sum to 100%, dates align with data).
+
+#### **Step 2: Initialize Portfolio**
+- Calculate initial trade sizes based on:
+  - Initial capital.
+  - Target allocations.
+  - First available prices in the dataset.
+- Execute trades to establish the starting portfolio.
+
+#### **Step 3: Simulate Portfolio Performance**
+1. **Without Rebalancing**:
+   - Calculate portfolio value at each time step based on price changes.
+2. **With Rebalancing**:
+   - Recalculate allocations at specified intervals (e.g., monthly).
+   - Adjust holdings to maintain target weights.
+
+#### **Step 4: Generate Outputs**
+- Time series of portfolio value.
+- Time series of allocations (if rebalancing).
+- Performance metrics:
+  - Total return
+  - CAGR
+  - Sharpe ratio
+  - Drawdown
+  - Volatility
+
+---
+
+### **4. Function Specifications**
+
+#### **Core Functions**
+1. **`initialize_portfolio()`**:
+   - **Inputs:** Initial capital, target allocations, first prices.
+   - **Outputs:** Initial holdings.
+   - **Logic:**
+     - Calculate the number of shares to buy for each ticker.
+     - Track cash remaining (if any).
+
+2. **`simulate_portfolio()`**:
+   - **Inputs:** Holdings, price data, rebalancing frequency (optional).
+   - **Outputs:** Time series of portfolio value, allocation history.
+   - **Logic:**
+     - Iterate through each time step in the data.
+     - Update portfolio value based on price changes.
+     - Apply rebalancing logic if frequency is specified.
+
+3. **`rebalance_portfolio()`**:
+   - **Inputs:** Current holdings, target allocations, current prices.
+   - **Outputs:** Updated holdings after rebalancing.
+   - **Logic:**
+     - Calculate portfolio value.
+     - Determine required trades to match target weights.
+     - Adjust holdings accordingly.
+
+4. **`calculate_metrics()`**:
+   - **Inputs:** Portfolio time series.
+   - **Outputs:** Performance metrics (CAGR, Sharpe ratio, etc.).
+   - **Logic:**
+     - Compute metrics based on portfolio value changes over time.
+
+---
+
+### **5. Testing Plan**
+
+#### **Test Data**
+- Tickers: `SPY`, `TLT`
+- Historical period: Last 5 years (or available data range).
+- Initial capital: $10,000.
+- Target allocations: 60% SPY, 40% TLT.
+- Rebalancing frequency: Monthly.
+
+#### **Test Cases**
+1. **Simple Buy-and-Hold:**
+   - Verify portfolio value matches expected returns without rebalancing.
+   - Check allocations remain constant over time.
+
+2. **Buy-and-Hold with Rebalancing:**
+   - Verify rebalancing occurs at specified intervals.
+   - Check allocations realign to targets after each rebalance.
+
+3. **Performance Metrics:**
+   - Confirm metrics match expected values based on historical data.
+
+#### **Validation Criteria**
+- Outputs align with known benchmarks for the given test data.
+- Portfolio value and allocations are consistent with trade logic.
+- Metrics are accurate and reproducible.
+
+---
+
+### **6. Deliverables**
+- Fully implemented Buy-and-Hold strategy (with and without rebalancing).
+- End-to-end test script with sample data.
+- Performance report comparing both variations.
+
+---
+
+### **7. Collaboration Plan**
+- **FN_Developer GPT:** Implement core functions and testing script.
+- **FN_Architect GPT:** Review implementation, validate outputs, and refine the design.
+
+---
+
+### **8. Next Steps**
+1. Assign tasks to Developer GPT.
+2. Validate initial implementation against test cases.
+3. Iterate based on findings and feedback.
+
+---
+
