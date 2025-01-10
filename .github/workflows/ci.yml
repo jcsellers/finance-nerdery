@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - main
+      - 'feature/**'
 
 jobs:
   lint:
@@ -27,6 +28,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 isort black autoflake
 
+      - name: Run Black and isort in fix mode
+        run: |
+          black src tests
+          isort src tests
+          autoflake --remove-unused-variables --remove-all-unused-imports --recursive .
+
       - name: Run isort (Import Sorting)
         run: isort src tests --check --diff
 
@@ -40,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository 
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -52,14 +59,16 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
-             cp .env.test .env
+        run: |
+          echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
+          cp .env.test .env
+     
       - name: Run Database Validation
         run: python scripts/database_validation.py
-        
-
 
       - name: Run all tests
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: pytest tests/
+        run: |
+          mkdir -p data/output
+          pytest tests/
