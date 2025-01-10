@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from unittest.mock import patch
-
+from dotenv import load_dotenv
 import pandas as pd
 import pytest
 from align_data import align_datasets
@@ -16,7 +16,7 @@ TEST_ECONOMIC_DIR = "test_data/test_economic"
 TEST_ALIGNED_DIR = "test_data/test_aligned"
 
 
-from dotenv import load_dotenv
+
 
 # Load the test environment variables
 load_dotenv(dotenv_path=".env.test")
