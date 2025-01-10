@@ -1,5 +1,6 @@
 import sqlite3
-import os
+
+
 def create_test_db(db_path):
     """Create a deterministic test database."""
     # Connect to SQLite and create the deterministic database
@@ -7,7 +8,8 @@ def create_test_db(db_path):
     cursor = connection.cursor()
 
     # Create the `data` table
-    cursor.execute("""
+    cursor.execute(
+        """
     CREATE TABLE IF NOT EXISTS data (
         ticker TEXT,
         Date TEXT,
@@ -17,7 +19,8 @@ def create_test_db(db_path):
         Close REAL,
         Volume INTEGER
     );
-    """)
+    """
+    )
 
     # Insert deterministic data
     deterministic_data = [
@@ -28,12 +31,14 @@ def create_test_db(db_path):
         ("TEST", "2023-01-05", 120, 130, 110, 125, 1500),
     ]
 
-    cursor.executemany("""
+    cursor.executemany(
+        """
     INSERT INTO data (ticker, Date, Open, High, Low, Close, Volume)
     VALUES (?, ?, ?, ?, ?, ?, ?);
-    """, deterministic_data)
+    """,
+        deterministic_data,
+    )
 
     connection.commit()
     connection.close()
-
-print(f"Deterministic test database created at: {test_db_path}")
+    print(f"Deterministic test database created at: {db_path}")

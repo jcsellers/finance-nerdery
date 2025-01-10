@@ -1,10 +1,9 @@
+from create_test_db import create_test_db
 import os
 import pkgutil
 import sys
 
 print("PYTHONPATH:", sys.path)
-
-from create_test_db import create_test_db
 
 
 scripts_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../scripts"))

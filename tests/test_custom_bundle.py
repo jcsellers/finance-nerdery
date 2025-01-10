@@ -11,7 +11,8 @@ def test_generate_csv_from_db(tmp_path):
     cursor = connection.cursor()
 
     # Create the data table
-    cursor.execute("""
+    cursor.execute(
+        """
     CREATE TABLE data (
         ticker TEXT,
         Date TEXT,
@@ -21,13 +22,16 @@ def test_generate_csv_from_db(tmp_path):
         Close REAL,
         Volume INTEGER
     );
-    """)
+    """
+    )
 
     # Insert test data into the table
-    cursor.execute("""
+    cursor.execute(
+        """
     INSERT INTO data (ticker, Date, Open, High, Low, Close, Volume)
     VALUES ('TEST', '2023-01-01', 100, 110, 90, 105, 1000);
-    """)
+    """
+    )
 
     # Commit and close the database
     connection.commit()
@@ -45,5 +49,5 @@ def test_generate_csv_from_db(tmp_path):
     # Validate the contents of the CSV file
     df = pd.read_csv(temp_csv_path)
     assert len(df) == 1  # Only one row should be present
-    assert df.iloc[0]['sid'] == 'TEST'  # Check the ticker value
-    assert df.iloc[0]['close'] == 105  # Check the closing price
+    assert df.iloc[0]["sid"] == "TEST"  # Check the ticker value
+    assert df.iloc[0]["close"] == 105  # Check the closing price
