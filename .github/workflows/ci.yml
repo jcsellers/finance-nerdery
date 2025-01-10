@@ -31,7 +31,7 @@ jobs:
         run: |
           black src tests
           isort src tests
-          autoflake --recursive .
+          autoflake --remove-unused-variables --remove-all-unused-imports --recursive .
 
       - name: Run isort (Import Sorting)
         run: isort src tests --check --diff
