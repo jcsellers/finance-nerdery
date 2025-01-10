@@ -57,9 +57,9 @@ jobs:
       - name: Run Database Validation
         run: python scripts/database_validation.py
         
-      - name: Set environment variables
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+
 
       - name: Run all tests
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: pytest tests/
