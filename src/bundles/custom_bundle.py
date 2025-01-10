@@ -91,7 +91,8 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
         for sid, df in data.groupby("sid"):
             yield sid, df
 
-    daily_bar_writer.write(data_generator(), show_progress=maybe_show_progress(show_progress))
+    # Pass `show_progress` to `maybe_show_progress`
+    daily_bar_writer.write(data_generator(), show_progress=maybe_show_progress(show_progress=show_progress))
 
 
 # Register the custom bundle
