@@ -1,6 +1,5 @@
 from .create_test_db import create_test_db
 from src.bundles.custom_bundle import generate_csv_from_db
-import os
 import pandas as pd
 
 import sys

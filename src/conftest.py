@@ -1,4 +1,3 @@
-from create_test_db import create_test_db
 import os
 import pkgutil
 import sys
