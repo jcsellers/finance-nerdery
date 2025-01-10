@@ -60,6 +60,7 @@ jobs:
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
              cp .env.test .env
+     
       - name: Run Database Validation
         run: python scripts/database_validation.py
 
@@ -68,4 +69,7 @@ jobs:
       - name: Run all tests
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: pytest tests/
+        run: 
+          steps:
+          -mkdir -p data/output
+          -pytest tests/
