@@ -16,9 +16,14 @@ TEST_ECONOMIC_DIR = "test_data/test_economic"
 TEST_ALIGNED_DIR = "test_data/test_aligned"
 
 
+from dotenv import load_dotenv
 
-# Load the test environment file
+# Load the test environment variables
 load_dotenv(dotenv_path=".env.test")
+
+# Debugging: Print environment variable to confirm loading
+print("FRED_API_KEY:", os.getenv("FRED_API_KEY"))
+
 
 # Setup and Teardown Fixtures
 @pytest.fixture(scope="function")
