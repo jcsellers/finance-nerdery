@@ -1,9 +1,11 @@
 import os
 import sqlite3
 from unittest.mock import patch
-from dotenv import load_dotenv
+
 import pandas as pd
 import pytest
+from dotenv import load_dotenv
+
 from align_data import align_datasets
 from create_sqlite_db import create_and_populate_unified_table
 from fetch_fred_data import fetch_fred_data
