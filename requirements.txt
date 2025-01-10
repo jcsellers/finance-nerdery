@@ -13,3 +13,4 @@ autoflake
 isort
 python-dotenv
 zipline-reloaded
+autoflake
