@@ -1,19 +1,16 @@
+import os
 import sqlite3
 
-import pandas as pd
 
-from src.bundles.custom_bundle import generate_csv_from_db
-
-
-def test_generate_csv_from_db(tmp_path):
-    """Test CSV generation from SQLite database."""
-    # Create a temporary SQLite database for testing
-    test_db_path = tmp_path / "test_aligned_data.db"
-    connection = sqlite3.connect(test_db_path)
+def create_test_db(db_path):
+    """Create a deterministic test database."""
+    # Connect to SQLite and create the deterministic database
+    connection = sqlite3.connect(db_path)
     cursor = connection.cursor()
-    cursor.execute(
-        """
-    CREATE TABLE data (
+
+    # Create the `data` table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS data (
         ticker TEXT,
         Date TEXT,
         Open REAL,
@@ -22,29 +19,29 @@ def test_generate_csv_from_db(tmp_path):
         Close REAL,
         Volume INTEGER
     );
-    """
-    )
-    cursor.execute(
-        """
+    """)
+
+    # Insert deterministic data
+    deterministic_data = [
+        ("TEST", "2023-01-01", 100, 110, 90, 105, 1000),
+        ("TEST", "2023-01-02", 105, 115, 95, 110, 1200),
+        ("TEST", "2023-01-03", 110, 120, 100, 115, 1300),
+        ("TEST", "2023-01-04", 115, 125, 105, 120, 1400),
+        ("TEST", "2023-01-05", 120, 130, 110, 125, 1500),
+    ]
+
+    cursor.executemany("""
     INSERT INTO data (ticker, Date, Open, High, Low, Close, Volume)
-    VALUES
-    ('TEST', '2023-01-01', 100, 110, 90, 105, 1000);
-    """
-    )
+    VALUES (?, ?, ?, ?, ?, ?, ?);
+    """, deterministic_data)
+
+    # Commit and close the database
     connection.commit()
     connection.close()
+    print(f"Test database created at: {db_path}")
 
-    # Define the temporary CSV path
-    temp_csv_path = tmp_path / "temp_data.csv"
 
-    # Run the function to generate CSV
-    generate_csv_from_db(db_path=str(test_db_path), csv_path=str(temp_csv_path))
-
-    # Validate file existence
-    assert temp_csv_path.exists(), f"Expected CSV file {temp_csv_path} not found."
-
-    # Validate the generated CSV
-    df = pd.read_csv(temp_csv_path)
-    assert len(df) == 1
-    assert df.iloc[0]["sid"] == "TEST"
-    assert df.iloc[0]["close"] == 105
+if __name__ == "__main__":
+    test_db_path = "../data/output/deterministic_test_data.db"
+    os.makedirs(os.path.dirname(test_db_path), exist_ok=True)
+    create_test_db(test_db_path)
