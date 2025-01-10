@@ -6,7 +6,7 @@ from zipline.data.bundles import ingest, register
 from zipline.utils.cli import maybe_show_progress
 
 # Paths and configurations
-db_path = os.getenv("DB_PATH", "../data/output/aligned_data.db")  # Path to the database
+db_path = os.getenv("DB_PATH", "../.../data/output/aligned_data.db")  # Path to the database
 csv_temp_path = os.getenv(
     "TEMP_CSV_PATH", "../data/output/zipline_temp_data.csv"
 )  # Temporary CSV path
