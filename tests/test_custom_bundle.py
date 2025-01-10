@@ -1,16 +1,18 @@
-import os
 import sqlite3
+import pandas as pd
+from src.bundles.custom_bundle import generate_csv_from_db
 
 
-def create_test_db(db_path):
-    """Create a deterministic test database."""
-    # Connect to SQLite and create the deterministic database
-    connection = sqlite3.connect(db_path)
+def test_generate_csv_from_db(tmp_path):
+    """Test CSV generation from SQLite database."""
+    # Create a temporary SQLite database for testing
+    test_db_path = tmp_path / "test_aligned_data.db"
+    connection = sqlite3.connect(test_db_path)
     cursor = connection.cursor()
 
-    # Create the `data` table
+    # Create the data table
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS data (
+    CREATE TABLE data (
         ticker TEXT,
         Date TEXT,
         Open REAL,
@@ -21,27 +23,27 @@ def create_test_db(db_path):
     );
     """)
 
-    # Insert deterministic data
-    deterministic_data = [
-        ("TEST", "2023-01-01", 100, 110, 90, 105, 1000),
-        ("TEST", "2023-01-02", 105, 115, 95, 110, 1200),
-        ("TEST", "2023-01-03", 110, 120, 100, 115, 1300),
-        ("TEST", "2023-01-04", 115, 125, 105, 120, 1400),
-        ("TEST", "2023-01-05", 120, 130, 110, 125, 1500),
-    ]
-
-    cursor.executemany("""
+    # Insert test data into the table
+    cursor.execute("""
     INSERT INTO data (ticker, Date, Open, High, Low, Close, Volume)
-    VALUES (?, ?, ?, ?, ?, ?, ?);
-    """, deterministic_data)
+    VALUES ('TEST', '2023-01-01', 100, 110, 90, 105, 1000);
+    """)
 
     # Commit and close the database
     connection.commit()
     connection.close()
-    print(f"Test database created at: {db_path}")
 
+    # Define the path for the temporary CSV file
+    temp_csv_path = tmp_path / "temp_data.csv"
 
-if __name__ == "__main__":
-    test_db_path = "../data/output/deterministic_test_data.db"
-    os.makedirs(os.path.dirname(test_db_path), exist_ok=True)
-    create_test_db(test_db_path)
+    # Generate the CSV using the function under test
+    generate_csv_from_db(db_path=str(test_db_path), csv_path=str(temp_csv_path))
+
+    # Validate that the CSV file exists
+    assert temp_csv_path.exists(), f"Expected CSV file {temp_csv_path} not found."
+
+    # Validate the contents of the CSV file
+    df = pd.read_csv(temp_csv_path)
+    assert len(df) == 1  # Only one row should be present
+    assert df.iloc[0]['sid'] == 'TEST'  # Check the ticker value
+    assert df.iloc[0]['close'] == 105  # Check the closing price
