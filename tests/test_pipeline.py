@@ -49,7 +49,7 @@ def setup_test_environment():
 # Test fetch_fred_data
 @patch.dict(os.environ, {"FRED_API_KEY": "test_key"})
 def test_fetch_fred_data(setup_test_environment):
-    fred_symbols = ["TEST_FRED"]
+    fred_symbols = ["GDP"]
     fetch_fred_data(fred_symbols, output_dir=TEST_ECONOMIC_DIR)
 
     output_file = os.path.join(TEST_ECONOMIC_DIR, "TEST_FRED.csv")
