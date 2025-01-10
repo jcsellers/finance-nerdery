@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install linting dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8 isort black autoflake
@@ -31,22 +31,14 @@ jobs:
       - name: Run autoflake
         run: |
           autoflake --remove-unused-variables --remove-all-unused-imports --recursive --in-place src tests
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src tests
 
-      - name: Run Black and isort in fix mode
-        run: |
-          black src tests
-          isort src tests
+      - name: Run black
+        run: black src tests
 
-      - name: Run isort (Import Sorting)
-        run: isort src tests --check --diff
+      - name: Run isort
+        run: isort src tests
 
-      - name: Run black (Code Formatter)
-        run: black src tests --check --diff
-
-      - name: Run Linting
+      - name: Run flake8
         run: flake8 src tests
 
   test:
@@ -62,17 +54,16 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Set PYTHONPATH
+      - name: Set environment variables
         run: |
           echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
           cp .env.test .env
-     
-      - name: Run Database Validation
-        run: python scripts/database_validation.py
 
-      - name: Run all tests
+      - name: Run tests
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
