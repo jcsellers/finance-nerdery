@@ -1,13 +1,13 @@
 import argparse
 import json
 from datetime import datetime
-from zipline.api import order, record, symbol
+from zipline.api import order, record, symbol as zipline_symbol
 from zipline import run_algorithm
 
 
 def initialize(context, asset_symbol):
     """Initialize the strategy with a configurable asset."""
-    context.asset = symbol(asset_symbol)
+    context.asset = zipline_symbol(asset_symbol)
 
 
 def handle_data(context, data):
@@ -18,7 +18,7 @@ def handle_data(context, data):
 
 
 def run_buy_and_hold(
-    symbol="TEST", start_date="2023-01-01", end_date="2023-01-05", capital_base=100000
+    asset_symbol="TEST", start_date="2023-01-01", end_date="2023-01-05", capital_base=100000
 ):
     """Run the buy-and-hold strategy with configurable parameters."""
     start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -26,7 +26,7 @@ def run_buy_and_hold(
     result = run_algorithm(
         start=start,
         end=end,
-        initialize=lambda context: initialize(context, symbol),
+        initialize=lambda context: initialize(context, asset_symbol),
         handle_data=handle_data,
         capital_base=capital_base,
         data_frequency="daily",
@@ -65,14 +65,14 @@ if __name__ == "__main__":
     config = load_config(args.config)
 
     # Override with CLI arguments if provided
-    symbol = args.symbol or config.get("symbol", "TEST")
+    asset_symbol = args.symbol or config.get("symbol", "TEST")
     start_date = args.start or config.get("start_date", "2023-01-01")
     end_date = args.end or config.get("end_date", "2023-01-05")
     capital_base = args.capital or config.get("capital_base", 100000)
 
     # Run the strategy
     result = run_buy_and_hold(
-        symbol=symbol,
+        asset_symbol=asset_symbol,
         start_date=start_date,
         end_date=end_date,
         capital_base=capital_base,
