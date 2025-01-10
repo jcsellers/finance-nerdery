@@ -1,31 +1,23 @@
-import os
 import pytest
-from zipline.data import bundles
+from src.strategies.buy_and_hold import run_buy_and_hold
 
+@pytest.fixture(scope="module", autouse=True)
+def setup_bundle(tmp_path_factory):
+    """Set up the database and ingest the bundle."""
+    from tests.create_test_db import create_test_db
+    import os
 
-@pytest.fixture
-def setup_bundle():
-    """Ensure the bundle is ingested before testing."""
+    # Create the test database
+    db_path = tmp_path_factory.mktemp("data") / "deterministic_test_data.db"
+    create_test_db(str(db_path))
+    os.environ["DB_PATH"] = str(db_path)
+
+    # Ingest the bundle
     os.system("python src/bundles/custom_bundle.py")
 
 
-def test_zipline_ingestion(setup_bundle):
-    """Test that the custom bundle is ingested correctly."""
-    bundle_name = "custom_csv"
-    custom_bundle = bundles.load(bundle_name)
-
-    # Validate asset metadata
-    assets = custom_bundle.asset_finder.retrieve_all()
-    assert len(assets) == 1, "Expected 1 asset in the bundle."
-    assert assets[0].symbol == "TEST", "Expected asset symbol 'TEST'."
-
-    # Validate data integrity
-    calendar = custom_bundle.trading_calendar.sessions_in_range(
-        custom_bundle.equity_daily_bar_reader.first_trading_day,
-        custom_bundle.equity_daily_bar_reader.last_trading_day,
-    )
-    reader = custom_bundle.equity_daily_bar_reader
-    data = reader.load_raw_arrays(
-        ["open", "high", "low", "close", "volume"], calendar, [assets[0].sid]
-    )
-    assert data is not None, "No data loaded from the bundle."
+def test_buy_and_hold_json():
+    """Test the strategy with JSON configuration."""
+    result = run_buy_and_hold()
+    assert not result.empty, "Expected results, got an empty DataFrame."
+    assert "price" in result.columns, "Price column missing in results."

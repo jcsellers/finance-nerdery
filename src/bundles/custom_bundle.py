@@ -14,9 +14,9 @@ csv_temp_path = os.getenv(
 
 def generate_csv_from_db(db_path=None, csv_path=None):
     """Generate a CSV file from the SQLite database."""
-    db_path = db_path or os.getenv("DB_PATH", "../data/output/aligned_data.db")
+    db_path = db_path or os.getenv("DB_PATH", "../../data/output/aligned_data.db")
     csv_path = csv_path or os.getenv(
-        "TEMP_CSV_PATH", "../data/output/zipline_temp_data.csv"
+        "TEMP_CSV_PATH", "../../data/output/zipline_temp_data.csv"
     )
 
     print(f"DB_PATH: {db_path}")
@@ -104,5 +104,6 @@ register("custom_csv", custom_bundle)
 
 if __name__ == "__main__":
     # Ingest the bundle
-    os.environ["ZIPLINE_ROOT"] = "../data/zipline_root"  # Set Zipline's root directory
+    os.environ["ZIPLINE_ROOT"] = "../../data/zipline_root"  # Set Zipline's root directory
+
     ingest("custom_csv")
