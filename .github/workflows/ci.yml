@@ -27,6 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install flake8 isort black autoflake
+
       - name: Run Black and isort in fix mode
         run: |
           black src tests
@@ -58,18 +59,16 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
-             cp .env.test .env
+        run: |
+          echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
+          cp .env.test .env
      
       - name: Run Database Validation
         run: python scripts/database_validation.py
 
-
-
       - name: Run all tests
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: 
-          steps:
-          -mkdir -p data/output
-          -pytest tests/
+        run: |
+          mkdir -p data/output
+          pytest tests/
