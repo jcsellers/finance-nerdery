@@ -13,11 +13,15 @@ csv_temp_path = os.getenv(
 
 
 def generate_csv_from_db(db_path=None, csv_path=None):
-    """Generate a CSV file from the SQLite database."""
     db_path = db_path or os.getenv("DB_PATH", "../../data/output/aligned_data.db")
-    csv_path = csv_path or os.getenv(
-        "TEMP_CSV_PATH", "../../data/output/zipline_temp_data.csv"
-    )
+    csv_path = csv_path or os.getenv("TEMP_CSV_PATH", "../../data/output/zipline_temp_data.csv")
+
+    # Ensure the output directory exists
+    csv_dir = os.path.dirname(csv_path)
+    os.makedirs(csv_dir, exist_ok=True)
+
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(f"Database file not found: {db_path}")
 
     print(f"DB_PATH: {db_path}")
     print(f"TEMP_CSV_PATH: {csv_path}")
