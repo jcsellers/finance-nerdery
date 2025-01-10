@@ -52,7 +52,7 @@ def test_fetch_fred_data(setup_test_environment):
     fred_symbols = ["GDP"]
     fetch_fred_data(fred_symbols, output_dir=TEST_ECONOMIC_DIR)
 
-    output_file = os.path.join(TEST_ECONOMIC_DIR, "TEST_FRED.csv")
+    output_file = os.path.join(TEST_ECONOMIC_DIR, "GDP.csv")
     assert os.path.exists(output_file)
     df = pd.read_csv(output_file)
     assert "Date" in df.columns and "Open" in df.columns
