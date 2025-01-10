@@ -11,3 +11,4 @@ fredapi
 black
 isort
 python-dotenv
+zipline-reloaded
