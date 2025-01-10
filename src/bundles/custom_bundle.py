@@ -24,13 +24,13 @@ def generate_csv_from_db(db_path=None, csv_path=None):
 
     connection = sqlite3.connect(db_path)
     query = """
-    SELECT 
-        ticker AS sid, 
-        Date AS date, 
-        Open AS open, 
-        High AS high, 
-        Low AS low, 
-        Close AS close, 
+    SELECT
+        ticker AS sid,
+        Date AS date,
+        Open AS open,
+        High AS high,
+        Low AS low,
+        Close AS close,
         Volume AS volume
     FROM data;
     """
@@ -51,7 +51,7 @@ def generate_csv_from_db(db_path=None, csv_path=None):
 
     connection.close()
 
-
+#.
 # Custom Zipline bundle
 def custom_bundle(
     environ,

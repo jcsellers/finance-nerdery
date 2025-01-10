@@ -5,7 +5,7 @@ import pandas as pd
 
 from src.bundles.custom_bundle import generate_csv_from_db
 
-
+#test
 def test_generate_csv_from_db(tmp_path):
     """Test CSV generation from SQLite database."""
     # Create a temporary SQLite database for testing
