@@ -55,7 +55,7 @@ def generate_csv_from_db(db_path=None, csv_path=None):
 
     connection.close()
 
-
+#.
 # Custom Zipline bundle
 def custom_bundle(
     environ,
