@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import pandas as pd
-from zipline.data.bundles import register
+from zipline.data.bundles import register, ingest
 from zipline.utils.cli import maybe_show_progress
 
 
@@ -96,3 +96,15 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)
+
+if __name__ == "__main__":
+    os.environ["ZIPLINE_ROOT"] = os.path.abspath("data/zipline_root")
+    print(f"ZIPLINE_ROOT: {os.environ['ZIPLINE_ROOT']}")
+
+    # Ingest the bundle
+    try:
+        ingest("custom_csv")
+        print("Bundle ingestion completed successfully.")
+    except Exception as e:
+        print(f"Error during ingestion: {e}")
+        raise
