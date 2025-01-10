@@ -9,6 +9,7 @@
       branches:
         - main
         - feature/**
+
   jobs:
     lint:
       runs-on: ubuntu-latest
@@ -33,6 +34,7 @@
           run: isort src tests
         - name: Run flake8
           run: flake8 src tests
+
     test:
       runs-on: ubuntu-latest
       steps:
@@ -49,15 +51,17 @@
         - name: Set environment variables
           run: |
             echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
+            echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
+            echo "DB_PATH=$(pwd)/data/output/aligned_data.db" >> $GITHUB_ENV
+            echo "TEMP_CSV_PATH=$(pwd)/data/output/zipline_temp_data.csv" >> $GITHUB_ENV
             cp .env.test .env
+        - name: Ensure output directories exist
+          run: mkdir -p data/output data/zipline_root
+        - name: Generate Custom CSV
+          run: python scripts/generate_csv.py
         - name: Ingest Custom CSV Bundle
-          run: |
-            mkdir -p data/output
-            python scripts/generate_csv.py  # Script to generate the temp CSV
-            zipline ingest -b custom_csv
+          run: python src/bundles/custom_bundle.py
         - name: Run tests
           env:
             FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          run: |
-            mkdir -p data/output
-            pytest tests/
+          run: pytest tests/

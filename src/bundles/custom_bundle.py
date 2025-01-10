@@ -1,18 +1,16 @@
 import os
 import sqlite3
-
 import pandas as pd
 from zipline.data.bundles import ingest, register
 from zipline.utils.cli import maybe_show_progress
 
 # Paths and configurations
-db_path = os.getenv("DB_PATH", "../.../data/output/aligned_data.db")  # Path to the database
-csv_temp_path = os.getenv(
-    "TEMP_CSV_PATH", "../data/output/zipline_temp_data.csv"
-)  # Temporary CSV path
+db_path = os.getenv("DB_PATH", "../../data/output/aligned_data.db")  # Path to the database
+csv_temp_path = os.getenv("TEMP_CSV_PATH", "../../data/output/zipline_temp_data.csv")  # Temporary CSV path
 
 
 def generate_csv_from_db(db_path=None, csv_path=None):
+    """Generate a CSV file from the SQLite database."""
     db_path = db_path or os.getenv("DB_PATH", "../../data/output/aligned_data.db")
     csv_path = csv_path or os.getenv("TEMP_CSV_PATH", "../../data/output/zipline_temp_data.csv")
 
@@ -55,24 +53,18 @@ def generate_csv_from_db(db_path=None, csv_path=None):
 
     connection.close()
 
-#.
-# Custom Zipline bundle
-def custom_bundle(
-    environ,
-    asset_db_writer,
-    minute_bar_writer,
-    daily_bar_writer,
-    adjustment_writer,
-    calendar,
-    start_session,
-    end_session,
-    cache,
-    show_progress,
-    output_dir,
-):
+
+def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
+                  adjustment_writer, calendar, start_session, end_session, cache,
+                  show_progress, output_dir):
     """Custom data bundle to ingest CSV data."""
-    # Generate CSV from database
-    generate_csv_from_db()
+    generate_csv_from_db()  # Generate CSV from database
+
+    # Ensure the CSV file exists
+    if not os.path.exists(csv_temp_path):
+        raise FileNotFoundError(f"CSV file not found: {csv_temp_path}")
+
+    print(f"CSV file ready for ingestion: {csv_temp_path}")
 
     # Load the CSV into a DataFrame
     data = pd.read_csv(csv_temp_path, parse_dates=["date"])
@@ -107,7 +99,9 @@ def custom_bundle(
 register("custom_csv", custom_bundle)
 
 if __name__ == "__main__":
-    # Ingest the bundle
-    os.environ["ZIPLINE_ROOT"] = "../../data/zipline_root"  # Set Zipline's root directory
+    # Set the Zipline root directory for bundle storage
+    os.environ["ZIPLINE_ROOT"] = os.path.abspath("data/zipline_root")
+    print(f"ZIPLINE_ROOT: {os.environ['ZIPLINE_ROOT']}")
 
+    # Ingest the bundle
     ingest("custom_csv")
