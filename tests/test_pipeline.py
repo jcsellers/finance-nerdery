@@ -16,6 +16,10 @@ TEST_ECONOMIC_DIR = "test_data/test_economic"
 TEST_ALIGNED_DIR = "test_data/test_aligned"
 
 
+
+# Load the test environment file
+load_dotenv(dotenv_path=".env.test")
+
 # Setup and Teardown Fixtures
 @pytest.fixture(scope="function")
 def setup_test_environment():
