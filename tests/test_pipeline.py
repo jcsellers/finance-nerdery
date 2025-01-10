@@ -4,10 +4,9 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
-from dotenv import load_dotenv
-
 from align_data import align_datasets
 from create_sqlite_db import create_and_populate_unified_table
+from dotenv import load_dotenv
 from fetch_fred_data import fetch_fred_data
 from synthetic_dataset_generator import generate_cash_dataset, generate_linear_trend
 
@@ -16,8 +15,6 @@ TEST_DB_PATH = "test_output/test_aligned_data.db"
 TEST_TICKER_FILE = "test_data/test_ticker_file.csv"
 TEST_ECONOMIC_DIR = "test_data/test_economic"
 TEST_ALIGNED_DIR = "test_data/test_aligned"
-
-
 
 
 # Load the test environment variables
