@@ -91,16 +91,20 @@ def custom_bundle(
     data = generate_asset_mapping(data)
 
     # Define the data generator for Zipline
-    data_generator = (
-        (sid, df)
-        for sid, df in data.groupby("sid")
-    )
+    def data_generator():
+        for sid, df in data.groupby("sid"):
+            yield sid, df
 
-    # Wrap the data generator with maybe_show_progress
-    wrapped_generator = maybe_show_progress(data_generator, show_progress)
+    # Wrap the generator with maybe_show_progress
+    wrapped_generator = maybe_show_progress(data_generator(), show_progress=show_progress)
+
+    # Iterate explicitly to create a compatible generator
+    def compatible_generator():
+        for item in wrapped_generator:
+            yield item
 
     # Write daily bar data
-    daily_bar_writer.write(wrapped_generator, show_progress=show_progress)
+    daily_bar_writer.write(compatible_generator(), show_progress=show_progress)
 
 
 # Register the custom bundle
