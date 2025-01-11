@@ -64,6 +64,7 @@ jobs:
           echo "DB_PATH=$(pwd)/data/output/aligned_data.db" >> $GITHUB_ENV
           echo "CSV_PATH=$(pwd)/data/output/generated_data.csv" >> $GITHUB_ENV
           echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
+          export PYTHONPATH=$(pwd)/scripts:$(pwd)/src:$PYTHONPATH
 
       - name: Generate CSV Data
         run: |
