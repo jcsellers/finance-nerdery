@@ -1,5 +1,4 @@
 import pytest
-
 from src.strategies.buy_and_hold import run_buy_and_hold
 
 
