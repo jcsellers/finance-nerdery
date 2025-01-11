@@ -32,13 +32,16 @@ jobs:
           autoflake --remove-unused-variables --remove-all-unused-imports --recursive --in-place src tests scripts
 
       - name: Run black
-        run: black src tests scripts
+        run: |
+          black src tests scripts
 
       - name: Run isort
-        run: isort src tests scripts
+        run: |
+          isort src tests scripts
 
       - name: Run flake8
-        run: flake8 src tests scripts
+        run: |
+          flake8 src tests scripts
 
   test:
     runs-on: ubuntu-latest
@@ -61,10 +64,14 @@ jobs:
           echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
           cp .env.test .env
 
-      - name: Ingest Custom CSV Bundle
+      - name: Generate CSV Data
         run: |
           mkdir -p data/output
           python scripts/generate_csv.py
+
+      - name: Register and Ingest Custom CSV Bundle
+        run: |
+          python scripts/register_custom_csv.py
           zipline ingest -b custom_csv
 
       - name: Run tests
