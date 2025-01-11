@@ -2,20 +2,10 @@ import os
 import sqlite3
 import pandas as pd
 from zipline.data.bundles import register
-from zipline.utils.cli import maybe_show_progress
-
+from src.utils.data_validation import validate_columns, validate_asset_metadata
 # Paths and configurations
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
 CSV_PATH = os.getenv("CSV_PATH", "data/output/zipline_temp_data.csv")
-
-
-def validate_columns(data):
-    """Ensure all required columns are present."""
-    required_columns = {"sid", "date", "open", "high", "low", "close", "volume"}
-    missing_columns = required_columns - set(data.columns)
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
-    print("All required columns are present.")
 
 
 def fetch_and_prepare_data():
@@ -23,43 +13,28 @@ def fetch_and_prepare_data():
     print(f"DB_PATH: {DB_PATH}")
     connection = sqlite3.connect(DB_PATH)
     query = """
-    SELECT
-        ticker AS sid,
-        Date AS date,
-        Open AS open,
-        High AS high,
-        Low AS low,
-        Close AS close,
-        Volume AS volume
+    SELECT ticker AS sid, Date AS date, Open AS open, High AS high, Low AS low, Close AS close, Volume AS volume
     FROM data;
     """
-    try:
-        data = pd.read_sql_query(query, connection)
-        connection.close()
-        print("Raw data fetched from the database:")
-        print(data.head())
+    data = pd.read_sql_query(query, connection)
+    connection.close()
 
-        # Validate columns
-        validate_columns(data)
+    print("Raw data fetched from the database:")
+    print(data.head())
 
-        # Drop rows with null dates
-        data = data.dropna(subset=["date"])
-        print("Data after dropping null dates:")
-        print(data.head())
+    validate_columns(data)
+    validate_asset_metadata(data)
 
-        # Filter placeholder rows
-        data = data[(data["high"] > 0) & (data["low"] > 0)]
-        print("Data after filtering placeholder rows:")
-        print(data.head())
+    # Drop rows with null dates
+    data = data.dropna(subset=["date"])
+    print("Data after dropping null dates:")
+    print(data.head())
 
-        # Write cleaned data to CSV
-        data.to_csv(CSV_PATH, index=False)
-        print(f"Equity data successfully written to {CSV_PATH}")
+    # Save cleaned data to a CSV file
+    data.to_csv(CSV_PATH, index=False)
+    print(f"Equity data successfully written to {CSV_PATH}")
 
-        return data
-    except Exception as e:
-        print(f"Error during data fetch: {e}")
-        raise
+    return data
 
 
 def custom_bundle(
@@ -75,8 +50,7 @@ def custom_bundle(
     show_progress,
     output_dir,
 ):
-    """Custom data bundle for ingestion."""
-    # Fetch and prepare data
+    """Custom bundle for ingesting data."""
     data = fetch_and_prepare_data()
 
     # Map assets to integer IDs
@@ -91,10 +65,9 @@ def custom_bundle(
 
     try:
         daily_bar_writer.write(data_generator(), show_progress=show_progress)
+        print(f"Ingested {len(unique_sids)} assets successfully.")
     except Exception as e:
-        print(f"Error during ingestion: {e}")
-        raise
-
+        raise RuntimeError(f"Error during ingestion: {e}")
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)
@@ -103,7 +76,6 @@ if __name__ == "__main__":
     from zipline.data.bundles.core import ingest
 
     try:
-        print(f"ZIPLINE_ROOT: {os.getenv('ZIPLINE_ROOT', 'data/zipline_root')}")
         ingest("custom_csv")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error during ingestion: {e}")

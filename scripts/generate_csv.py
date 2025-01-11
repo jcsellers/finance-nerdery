@@ -6,17 +6,33 @@ import os
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
 CSV_PATH = os.getenv("CSV_PATH", "data/output/generated_data.csv")
 
+def validate_and_clean_data(data):
+    """Ensure data conforms to required structure."""
+    required_columns = {"sid", "date", "open", "high", "low", "close", "volume"}
+    missing_columns = required_columns - set(data.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    data = data.dropna(subset=["date"])
+    data = data[
+        (data["open"] >= 0)
+        & (data["high"] >= 0)
+        & (data["low"] >= 0)
+        & (data["close"] >= 0)
+        & (data["volume"] >= 0)
+    ]
+    return data
+
 def generate_csv_from_db():
-    """
-    Generate a CSV file for Zipline ingestion, filtering based on data conformity.
-    """
+    """Generate a CSV file for Zipline ingestion."""
     print(f"DB_PATH: {DB_PATH}")
     print(f"CSV_PATH: {CSV_PATH}")
 
-    # Connect to the database
-    connection = sqlite3.connect(DB_PATH)
+    if not os.path.exists(DB_PATH):
+        raise FileNotFoundError(f"Database file not found at: {DB_PATH}")
 
-    # Fetch all data
+    connection = sqlite3.connect(DB_PATH)
     query = """
     SELECT
         ticker AS sid,
@@ -28,35 +44,24 @@ def generate_csv_from_db():
         Volume AS volume
     FROM data;
     """
-    data_df = pd.read_sql_query(query, connection)
-    data_df["date"] = pd.to_datetime(data_df["date"], errors="coerce")
-    data_df = data_df.dropna(subset=["date"])
-
-    print(f"Initial data rows: {len(data_df)}")
-    print(f"Initial data sample:\n{data_df.head()}")
-
-    # Filter rows with invalid data
-    valid_data = data_df[
-        (data_df["open"] >= 0)
-        & (data_df["high"] >= 0)
-        & (data_df["low"] >= 0)
-        & (data_df["close"] >= 0)
-        & (data_df["volume"] >= 0)
-    ]
-
-    print(f"Filtered data rows: {len(valid_data)}")
-    print(f"Filtered data sample:\n{valid_data.head()}")
-
-    # Save the valid data to a CSV
     try:
-        valid_data.to_csv(CSV_PATH, index=False)
-        print(f"Valid data successfully written to {CSV_PATH}")
-    except Exception as e:
-        print(f"Error writing valid data: {e}")
-        raise
+        data = pd.read_sql_query(query, connection)
+        connection.close()
 
-    connection.close()
-    return valid_data
+        print("Raw data fetched from the database:")
+        print(data.head())
+
+        # Validate and clean data
+        valid_data = validate_and_clean_data(data)
+        print("Validated and cleaned data:")
+        print(valid_data.head())
+
+        # Save the valid data to a CSV
+        valid_data.to_csv(CSV_PATH, index=False)
+        print(f"Data successfully written to {CSV_PATH}")
+    except Exception as e:
+        print(f"Error during data generation: {e}")
+        raise
 
 if __name__ == "__main__":
     try:
