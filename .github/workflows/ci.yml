@@ -1,67 +1,54 @@
----
-  name: CI/CD Pipeline
-  on:
-    push:
-      branches:
-        - main
-        - feature/**
-    pull_request:
-      branches:
-        - main
-        - feature/**
+name: CI/CD Pipeline
 
-  jobs:
-    lint:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v3
-        - name: Set up Python
-          uses: actions/setup-python@v4
-          with:
-            python-version: "3.11"
-        - name: Install dependencies
-          run: |
-            python -m pip install --upgrade pip
-            pip install flake8 isort black autoflake
-        - name: Run autoflake
-          run: >
-            autoflake --remove-unused-variables --remove-all-unused-imports --recursive
-            --in-place src tests
-        - name: Run black
-          run: black src tests
-        - name: Run isort
-          run: isort src tests
-        - name: Run flake8
-          run: flake8 src tests
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  pull_request:
+    branches:
+      - main
+      - feature/**
 
-    test:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v3
-        - name: Set up Python
-          uses: actions/setup-python@v4
-          with:
-            python-version: "3.11"
-        - name: Install dependencies
-          run: |
-            python -m pip install --upgrade pip
-            pip install -r requirements.txt
-        - name: Set environment variables
-          run: |
-            echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
-            echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
-            echo "DB_PATH=$(pwd)/data/output/aligned_data.db" >> $GITHUB_ENV
-            echo "TEMP_CSV_PATH=$(pwd)/data/output/zipline_temp_data.csv" >> $GITHUB_ENV
-            cp .env.test .env
-        - name: Ensure output directories exist
-          run: mkdir -p data/output data/zipline_root
-        - name: Generate Custom CSV
-          run: python scripts/generate_csv.py
-        - name: Ingest Custom CSV Bundle
-          run: python src/bundles/custom_bundle.py
-        - name: Run tests
-          env:
-            FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          run: pytest tests/
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 isort black autoflake
+      - name: Run autoflake
+        run: >
+          autoflake --remove-unused-variables --remove-all-unused-imports --recursive
+          --in-place src tests
+      - name: Run black
+        run: black src tests
+      - name: Run isort
+        run: isort src tests
+      - name: Run flake8
+        run: flake8 src tests
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run tests
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: pytest tests/
