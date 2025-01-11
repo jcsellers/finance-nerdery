@@ -1,6 +1,7 @@
-import sqlite3
-import pandas as pd
 import os
+import sqlite3
+
+import pandas as pd
 
 # Paths
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")

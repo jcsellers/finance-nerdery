@@ -1,6 +1,8 @@
-import pytest
 import os
+
 import pandas as pd
+import pytest
+
 from scripts.align_data import align_datasets
 
 

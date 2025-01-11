@@ -1,5 +1,7 @@
 import sqlite3
+
 import pandas as pd
+
 from src.bundles.custom_bundle import fetch_and_prepare_data, validate_columns
 
 

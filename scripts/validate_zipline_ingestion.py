@@ -1,5 +1,5 @@
-from zipline.data import bundles
 import pandas as pd
+from zipline.data import bundles
 
 # Load the custom bundle
 bundle_name = "custom_csv"

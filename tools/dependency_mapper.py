@@ -1,3 +1,4 @@
+import ast
 import os
 import re
 from collections import defaultdict
@@ -10,14 +11,17 @@ def parse_imports(filepath):
     """Parse imports and dependencies from a Python file."""
     dependencies = set()
     with open(filepath, "r", encoding="utf-8") as file:
-        tree = ast.parse(file.read(), filename=filepath)  # noqa: F821
-        for node in ast.walk(tree):  # noqa: F821
-            if isinstance(node, ast.Import):  # noqa: F821
-                for alias in node.names:
-                    dependencies.add(alias.name.split(".")[0])
-            elif isinstance(node, ast.ImportFrom):  # noqa: F821
-                if node.module:
-                    dependencies.add(node.module.split(".")[0])
+        try:
+            tree = ast.parse(file.read(), filename=filepath)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        dependencies.add(alias.name.split(".")[0])
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module:
+                        dependencies.add(node.module.split(".")[0])
+        except SyntaxError:
+            print(f"Skipping file with syntax error: {filepath}")
     return dependencies
 
 
@@ -26,7 +30,7 @@ def find_env_variables(root_dir):
     env_usage = defaultdict(list)
 
     # Regex to match os.environ or os.getenv
-    env_pattern = re.compile(r"os\\.(environ|getenv)\\(\\s*[\"'](\\w+)[\"']\\s*\\)")
+    env_pattern = re.compile(r"os\.(environ|getenv)\(\s*[\"'](\w+)[\"']\s*\)")
 
     for dirpath, _, filenames in os.walk(root_dir):
         for filename in filenames:
@@ -80,7 +84,7 @@ def visualize_dependency_map(
         G.add_node(file_node)
         for dep in dependencies:
             dep_node = file_mapping.get(dep, dep)
-            G.add_edge(file_node, dep_node)
+            G.add_edge(file_node, dep_node, label="Dependency")
 
     # Add shared environment variable nodes
     for var, locations in env_variables.items():
@@ -89,7 +93,7 @@ def visualize_dependency_map(
         for location in locations:
             file = location.split(":")[0]
             if file in file_mapping:
-                G.add_edge(file_mapping[file], shared_var_node)
+                G.add_edge(file_mapping[file], shared_var_node, label=f"Uses {var}")
 
     # Draw the graph
     plt.figure(figsize=(14, 10))
@@ -103,13 +107,18 @@ def visualize_dependency_map(
         font_weight="bold",
         arrowsize=20,
     )
+
+    # Add edge labels (dependencies and environment variables)
+    edge_labels = nx.get_edge_attributes(G, "label")
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
+
     plt.title("Dependency Map with Shared Environment Variables")
     plt.savefig(output)
     plt.show()
 
 
 if __name__ == "__main__":
-    root_directory = "src"  # Adjust this to your project root directory
+    root_directory = "../src"  # Adjust this to your project root directory
 
     # Build the dependency map
     dependency_map, file_mapping = build_dependency_map(root_directory)

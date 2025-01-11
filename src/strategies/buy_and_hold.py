@@ -1,8 +1,9 @@
 import argparse
 import json
 from datetime import datetime
-from zipline.api import order, record, symbol as zipline_symbol
+
 from zipline import run_algorithm
+from zipline.api import order, record, symbol as zipline_symbol
 
 
 def initialize(context, asset_symbol):

@@ -1,6 +1,8 @@
-import sqlite3
-import pandas as pd
 import os
+import sqlite3
+
+import pandas as pd
+
 from src.bundles.custom_bundle import fetch_and_prepare_data
 
 
@@ -47,7 +49,7 @@ def test_fetch_and_prepare_data(tmp_path):
     os.environ["CSV_PATH"] = str(temp_csv_path)
 
     # Fetch and prepare data
-    data = fetch_and_prepare_data()
+    fetch_and_prepare_data()
 
     # Validate the CSV
     assert temp_csv_path.exists(), f"Expected CSV file {temp_csv_path} not found."

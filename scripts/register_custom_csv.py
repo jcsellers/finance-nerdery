@@ -1,4 +1,5 @@
 import os
+
 from zipline.data.bundles import register
 from zipline.data.bundles.csvdir import csvdir_equities
 

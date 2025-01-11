@@ -1,14 +1,17 @@
-import sqlite3
-import pandas as pd
 import os
+import sqlite3
+
 from src.bundles.custom_bundle import fetch_and_prepare_data
-from utils.data_validation import validate_columns, validate_asset_metadata
+from src.utils.data_validation import validate_asset_metadata, validate_columns
+
+db_path = "path/to/test.db"
+csv_path = "path/to/test.csv"
+temp_csv_path = "path/to/temp.csv"
 
 
 def test_fetch_and_prepare_data(tmp_path):
     """Test data fetching and preparation."""
-    db_path = tmp_path / "test_aligned_data.db"
-    csv_path = tmp_path / "temp_data.csv"
+    test_db_path = tmp_path / "test_aligned_data.db"
 
     connection = sqlite3.connect(db_path)
     cursor = connection.cursor()
