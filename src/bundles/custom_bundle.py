@@ -5,7 +5,7 @@ import sqlite3
 import pandas as pd
 from zipline.data.bundles import register
 
-from src.utils.data_validation import validate_asset_metadata, validate_columns
+from scripts.utils.data_validation import validate_asset_metadata, validate_columns
 
 # Logging configuration
 logging.basicConfig(
