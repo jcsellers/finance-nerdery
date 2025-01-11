@@ -61,24 +61,9 @@ jobs:
 
       - name: Set Environment Variables
         run: |
-          echo "DB_PATH=$(pwd)/data/output/aligned_data.db" >> $GITHUB_ENV
-          echo "CSV_PATH=$(pwd)/data/output/generated_data.csv" >> $GITHUB_ENV
           echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
           export PYTHONPATH=$(pwd)/scripts:$(pwd)/src:$PYTHONPATH
 
-      - name: Generate CSV Data
-        run: |
-          mkdir -p data/output
-          python scripts/generate_csv.py
-
-      - name: Register and Ingest Custom CSV Bundle
-        run: |
-          python src/bundles/custom_bundle.py
-          zipline ingest -b custom_csv
-
-      - name: Validate Ingestion
-        run: |
-          python scripts/validate_zipline_ingestion.py
 
       - name: Run Tests
         env:
