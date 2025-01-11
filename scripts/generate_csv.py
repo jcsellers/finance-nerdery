@@ -1,77 +1,65 @@
-import os
 import sqlite3
 import pandas as pd
+import os
 
+# Paths
+DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
+CSV_PATH = os.getenv("CSV_PATH", "data/output/generated_data.csv")
 
-def generate_csv(db_path=None, csv_path=None):
+def generate_csv_from_db():
     """
-    Generate a CSV file from the SQLite database.
-
-    This script extracts data from the `data` table, validates it,
-    and writes the cleaned data to a CSV file.
+    Generate a CSV file for Zipline ingestion, filtering based on data conformity.
     """
-    # Default paths
-    db_path = db_path or os.getenv("DB_PATH", "data/output/aligned_data.db")
-    csv_path = csv_path or os.getenv("CSV_PATH", "data/output/generated_data.csv")
+    print(f"DB_PATH: {DB_PATH}")
+    print(f"CSV_PATH: {CSV_PATH}")
 
-    # Ensure the output directory exists
-    csv_dir = os.path.dirname(csv_path)
-    os.makedirs(csv_dir, exist_ok=True)
+    # Connect to the database
+    connection = sqlite3.connect(DB_PATH)
 
-    # Check database existence
-    if not os.path.exists(db_path):
-        raise FileNotFoundError(f"Database file not found: {db_path}")
-
-    print(f"DB_PATH: {db_path}")
-    print(f"CSV_PATH: {csv_path}")
-
-    # Connect to the database and fetch data
-    connection = sqlite3.connect(db_path)
+    # Fetch all data
     query = """
     SELECT
         ticker AS sid,
         Date AS date,
-        Open AS Open,
-        High AS High,
-        Low AS Low,
-        Close AS Close,
-        Volume AS Volume
+        Open AS open,
+        High AS high,
+        Low AS low,
+        Close AS close,
+        Volume AS volume
     FROM data;
     """
-    try:
-        data_df = pd.read_sql_query(query, connection)
-        data_df["date"] = pd.to_datetime(data_df["date"])
-        print(f"Data fetched from database:\n{data_df.head()}")
-        print(f"Columns in DataFrame: {data_df.columns.tolist()}")
-    except Exception as e:
-        print(f"Error fetching data: {e}")
-        raise
+    data_df = pd.read_sql_query(query, connection)
+    data_df["date"] = pd.to_datetime(data_df["date"], errors="coerce")
+    data_df = data_df.dropna(subset=["date"])
 
-    # Validate data: remove rows with zero prices
-    required_columns = ["High", "Low", "Open", "Close"]
-    for column in required_columns:
-        if column not in data_df.columns:
-            raise KeyError(f"Missing column in DataFrame: {column}")
+    print(f"Initial data rows: {len(data_df)}")
+    print(f"Initial data sample:\n{data_df.head()}")
 
-    data_df = data_df[
-        (data_df["High"] != 0) &
-        (data_df["Low"] != 0) &
-        (data_df["Open"] != 0) &
-        (data_df["Close"] != 0)
+    # Filter rows with invalid data
+    valid_data = data_df[
+        (data_df["open"] >= 0)
+        & (data_df["high"] >= 0)
+        & (data_df["low"] >= 0)
+        & (data_df["close"] >= 0)
+        & (data_df["volume"] >= 0)
     ]
-    print(f"Data after filtering zero prices:\n{data_df.head()}")
 
-    # Write the cleaned data to CSV
+    print(f"Filtered data rows: {len(valid_data)}")
+    print(f"Filtered data sample:\n{valid_data.head()}")
+
+    # Save the valid data to a CSV
     try:
-        data_df.to_csv(csv_path, index=False)
-        print(f"CSV successfully written to {csv_path}")
+        valid_data.to_csv(CSV_PATH, index=False)
+        print(f"Valid data successfully written to {CSV_PATH}")
     except Exception as e:
-        print(f"Error writing CSV: {e}")
+        print(f"Error writing valid data: {e}")
         raise
 
-    # Close the database connection
     connection.close()
-
+    return valid_data
 
 if __name__ == "__main__":
-    generate_csv()
+    try:
+        generate_csv_from_db()
+    except Exception as e:
+        print(f"Error during execution: {e}")
