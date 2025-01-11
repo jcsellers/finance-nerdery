@@ -73,18 +73,20 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     # Ensure all dates are valid and align with the trading calendar
     data["date"] = pd.to_datetime(data["date"], errors="coerce")  # Coerce invalid dates to NaT
     data = data.dropna(subset=["date"])  # Drop rows where date parsing failed
-    data = data[data["date"] >= start_session]  # Filter dates outside the calendar range
-    data = data[data["date"] <= end_session]  # Ensure dates are within the calendar range
+    data = data[(data["date"] >= start_session) & (data["date"] <= end_session)]  # Filter by date range
 
     # Filter dates that are not in the trading calendar
     valid_sessions = calendar.sessions_in_range(start_session, end_session)
-    invalid_dates = data[~data["date"].isin(valid_sessions)]  # Debugging: Identify invalid dates
-    if not invalid_dates.empty:
-        print(f"Invalid dates found:\n{invalid_dates}")
+    extra_dates = data[~data["date"].isin(valid_sessions)]  # Identify rows with invalid dates
+    if not extra_dates.empty:
+        print(f"Extra sessions:\n{extra_dates}")
 
-    # Keep only valid dates
+    # Retain only valid sessions
     data = data[data["date"].isin(valid_sessions)]
+
+    # Debugging: Print a summary of the data
     print(f"Validated data:\n{data.head()}")
+    print(f"Total rows after validation: {len(data)}")
 
     # Ensure column names are compatible
     data = data.rename(
