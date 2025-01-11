@@ -1,5 +1,6 @@
 import sqlite3
 import pandas as pd
+import os
 from src.bundles.custom_bundle import fetch_and_prepare_data
 
 
