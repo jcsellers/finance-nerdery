@@ -8,6 +8,7 @@ from zipline.utils.cli import maybe_show_progress
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
 CSV_PATH = os.getenv("CSV_PATH", "data/output/zipline_temp_data.csv")
 
+
 def generate_asset_mapping(data):
     """
     Map all asset identifiers (sids) to integer IDs.
@@ -17,11 +18,10 @@ def generate_asset_mapping(data):
     print(f"Asset mapping: {sid_to_asset_id}")
     return data
 
+
 def validate_data(data):
     """
     Ensure data conforms to Zipline's requirements.
-    - Drop rows with missing or placeholder values.
-    - Filter rows with valid columns (e.g., 'open', 'close').
     """
     print(f"Initial data rows: {len(data)}")
     print(f"Initial data:\n{data.head()}")
@@ -36,6 +36,7 @@ def validate_data(data):
     ]
     print(f"Validated data rows: {len(data)}")
     return data
+
 
 def generate_csv_from_db():
     """
@@ -66,6 +67,7 @@ def generate_csv_from_db():
 
     return data
 
+
 def custom_bundle(
     environ,
     asset_db_writer,
@@ -88,14 +90,18 @@ def custom_bundle(
     # Map all symbols to integer asset IDs
     data = generate_asset_mapping(data)
 
-    # Write daily bar data
-    daily_bar_writer.write(
-        maybe_show_progress(
-            ((sid, df) for sid, df in data.groupby("sid")),  # Proper generator
-            show_progress
-        ),
-        show_progress=show_progress
+    # Define the data generator for Zipline
+    data_generator = (
+        (sid, df)
+        for sid, df in data.groupby("sid")
     )
+
+    # Wrap the data generator with maybe_show_progress
+    wrapped_generator = maybe_show_progress(data_generator, show_progress)
+
+    # Write daily bar data
+    daily_bar_writer.write(wrapped_generator, show_progress=show_progress)
+
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)
