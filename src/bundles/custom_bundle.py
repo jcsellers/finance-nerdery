@@ -8,6 +8,7 @@ from zipline.utils.cli import maybe_show_progress
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
 CSV_PATH = os.getenv("CSV_PATH", "data/output/zipline_temp_data.csv")
 
+
 def validate_columns(data):
     """Ensure all required columns are present."""
     required_columns = {"sid", "date", "open", "high", "low", "close", "volume"}
@@ -16,8 +17,9 @@ def validate_columns(data):
         raise ValueError(f"Missing required columns: {missing_columns}")
     print("All required columns are present.")
 
+
 def fetch_and_prepare_data():
-    """Fetch data from the database and prepare it for ingestion."""
+    """Fetch data from the database and prepare for ingestion."""
     print(f"DB_PATH: {DB_PATH}")
     connection = sqlite3.connect(DB_PATH)
     query = """
@@ -32,7 +34,6 @@ def fetch_and_prepare_data():
     FROM data;
     """
     try:
-        # Fetch data
         data = pd.read_sql_query(query, connection)
         connection.close()
         print("Raw data fetched from the database:")
@@ -47,12 +48,7 @@ def fetch_and_prepare_data():
         print(data.head())
 
         # Filter placeholder rows
-        data = data[
-            (data["open"] != 0) &
-            (data["high"] != 0) &
-            (data["low"] != 0) &
-            (data["close"] != 0)
-        ]
+        data = data[(data["high"] > 0) & (data["low"] > 0)]
         print("Data after filtering placeholder rows:")
         print(data.head())
 
@@ -62,8 +58,9 @@ def fetch_and_prepare_data():
 
         return data
     except Exception as e:
-        print(f"Error during data fetch and preparation: {e}")
+        print(f"Error during data fetch: {e}")
         raise
+
 
 def custom_bundle(
     environ,
@@ -97,6 +94,7 @@ def custom_bundle(
     except Exception as e:
         print(f"Error during ingestion: {e}")
         raise
+
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)
