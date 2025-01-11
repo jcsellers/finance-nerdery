@@ -95,16 +95,11 @@ def custom_bundle(
         for sid, df in data.groupby("sid"):
             yield sid, df
 
-    # Wrap the generator with maybe_show_progress
+    # Use `maybe_show_progress` explicitly for iteration
     wrapped_generator = maybe_show_progress(data_generator(), show_progress=show_progress)
 
-    # Iterate explicitly to create a compatible generator
-    def compatible_generator():
-        for item in wrapped_generator:
-            yield item
-
     # Write daily bar data
-    daily_bar_writer.write(compatible_generator(), show_progress=show_progress)
+    daily_bar_writer.write((sid, df) for sid, df in wrapped_generator)
 
 
 # Register the custom bundle
