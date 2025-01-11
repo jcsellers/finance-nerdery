@@ -93,7 +93,10 @@ def custom_bundle(
         for sid, df in data.groupby("sid"):
             yield sid, df
 
-    daily_bar_writer.write(data_generator(), show_progress=maybe_show_progress(show_progress))
+    daily_bar_writer.write(
+        maybe_show_progress(data_generator(), show_progress),
+        show_progress=show_progress
+    )
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)
