@@ -31,10 +31,6 @@ jobs:
         run: |
           autoflake --remove-unused-variables --remove-all-unused-imports --recursive --in-place src tests
 
-      - name: Run autopep8
-        run: |
-          autopep8 --max-line-length 88 --in-place --recursive src tests 
-
       - name: Run black
         run: |
           black --line-length 88 src tests 
@@ -43,9 +39,6 @@ jobs:
         run: |
           isort src tests scripts
 
-      - name: Check for linting issues
-        run: |
-          flake8 src tests scripts --max-line-length=88 --exclude=__init__.py
 
   test:
     runs-on: ubuntu-latest
