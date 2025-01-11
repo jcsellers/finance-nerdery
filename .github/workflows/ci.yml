@@ -72,7 +72,7 @@ jobs:
 
       - name: Register and Ingest Custom CSV Bundle
         run: |
-          python scripts/custom_bundle.py
+          python src/bundles/custom_bundle.py
           zipline ingest -b custom_csv
 
       - name: Validate Ingestion
