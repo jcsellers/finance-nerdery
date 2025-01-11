@@ -39,7 +39,7 @@ def generate_csv_from_db(db_path=None, csv_path=None):
     """
     try:
         data_df = pd.read_sql_query(query, connection)
-        data_df["date"] = pd.to_datetime(data_df["date"])
+        data_df["date"] = pd.to_datetime(data_df["date"], errors="coerce")  # Coerce invalid dates
         print(f"Data fetched: {data_df.head()}")
     except Exception as e:
         print(f"Error fetching data: {e}")
@@ -70,21 +70,22 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     # Load the CSV into a DataFrame
     data = pd.read_csv(csv_temp_path, parse_dates=["date"])
 
-    # Ensure all dates are valid and align with the trading calendar
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")  # Coerce invalid dates to NaT
+    # Filter invalid and out-of-range dates
     data = data.dropna(subset=["date"])  # Drop rows where date parsing failed
     data = data[(data["date"] >= start_session) & (data["date"] <= end_session)]  # Filter by date range
 
-    # Filter dates that are not in the trading calendar
+    # Align with valid trading calendar sessions
     valid_sessions = calendar.sessions_in_range(start_session, end_session)
     extra_dates = data[~data["date"].isin(valid_sessions)]  # Identify rows with invalid dates
+
+    # Debugging: Print problematic rows
     if not extra_dates.empty:
         print(f"Extra sessions:\n{extra_dates}")
 
-    # Retain only valid sessions
+    # Keep only valid sessions
     data = data[data["date"].isin(valid_sessions)]
 
-    # Debugging: Print a summary of the data
+    # Debugging: Print summary of valid data
     print(f"Validated data:\n{data.head()}")
     print(f"Total rows after validation: {len(data)}")
 
