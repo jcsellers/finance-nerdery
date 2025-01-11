@@ -89,12 +89,11 @@ def custom_bundle(
     data = generate_asset_mapping(data)
 
     # Write daily bar data
-    def data_generator():
-        for sid, df in data.groupby("sid"):
-            yield sid, df
-
     daily_bar_writer.write(
-        maybe_show_progress(data_generator(), show_progress),
+        maybe_show_progress(
+            ((sid, df) for sid, df in data.groupby("sid")),  # Proper generator
+            show_progress
+        ),
         show_progress=show_progress
     )
 
