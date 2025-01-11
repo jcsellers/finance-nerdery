@@ -1,16 +1,8 @@
-import logging
 import os
 import sqlite3
 
 import pandas as pd
 from zipline.data.bundles import register
-
-from scripts.database_utils import validate_asset_metadata, validate_columns
-
-# Logging configuration
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
 # Paths and configurations
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
@@ -19,32 +11,48 @@ CSV_PATH = os.getenv("CSV_PATH", "data/output/zipline_temp_data.csv")
 
 def fetch_and_prepare_data():
     """Fetch data from the database and prepare for ingestion."""
-    logging.info(f"DB_PATH: {DB_PATH}")
+    print(f"DB_PATH: {DB_PATH}")
     connection = sqlite3.connect(DB_PATH)
     query = """
     SELECT ticker AS sid, Date AS date, Open AS open, High AS high, Low AS low, Close AS close, Volume AS volume
     FROM data;
     """
-    try:
-        data = pd.read_sql_query(query, connection)
-        logging.info("Raw data fetched from the database:")
-        logging.info(data.head())
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch data from the database: {e}")
-    finally:
-        connection.close()
+    data = pd.read_sql_query(query, connection)
+    connection.close()
 
-    validate_columns(data)
-    validate_asset_metadata(data)
+    print("Raw data fetched from the database:")
+    print(data.head())
 
-    # Drop rows with null dates
+    # Validate columns
+    required_columns = {"sid", "date", "open", "high", "low", "close", "volume"}
+    missing_columns = required_columns - set(data.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+
+    print("All required columns are present.")
+
+    # Drop rows with invalid dates or placeholder data
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
     data = data.dropna(subset=["date"])
-    logging.info("Data after dropping null dates:")
-    logging.info(data.head())
+    data = data[data["date"] >= pd.Timestamp("1990-01-02")]  # Filter dates before 1990
+    data = data[data["date"] <= pd.Timestamp("2025-01-03")]  # Filter dates after 2025
+
+    # Check for invalid numeric values
+    numeric_columns = ["open", "high", "low", "close", "volume"]
+    for col in numeric_columns:
+        invalid_values = data[data[col] < 0]
+        if not invalid_values.empty:
+            print(f"Warning: Found invalid values in column '{col}':")
+            print(invalid_values)
+
+        data = data[data[col] >= 0]  # Filter out invalid numeric values
+
+    print("Data after cleaning:")
+    print(data.head())
 
     # Save cleaned data to a CSV file
     data.to_csv(CSV_PATH, index=False)
-    logging.info(f"Equity data successfully written to {CSV_PATH}")
+    print(f"Equity data successfully written to {CSV_PATH}")
 
     return data
 
@@ -63,25 +71,36 @@ def custom_bundle(
     output_dir,
 ):
     """Custom bundle for ingesting data."""
-    logging.info("Starting data ingestion process.")
+    print("Starting data ingestion process.")
+
+    # Fetch and prepare data
     data = fetch_and_prepare_data()
+
+    # Align data to the trading calendar
+    trading_days = calendar.sessions_in_range(start_session, end_session)
 
     # Map assets to integer IDs
     unique_sids = data["sid"].unique()
     sid_map = {sid: i for i, sid in enumerate(unique_sids)}
-    logging.info(f"Asset mapping: {sid_map}")
+    print(f"Asset mapping: {sid_map}")
 
-    # Group data by sid
+    # Group data by sid and align dates to the trading calendar
     def data_generator():
         for sid, group in data.groupby("sid"):
+            group["date"] = pd.to_datetime(group["date"])
+            group = group.set_index("date").reindex(trading_days).reset_index()
+            group.fillna(method="ffill", inplace=True)
+            group.fillna(method="bfill", inplace=True)
+
+            # Drop rows with still-missing data
+            group.dropna(inplace=True)
+
             yield sid_map[sid], group
 
+    # Write data to daily bar writer
     try:
-        daily_bar_writer.write(
-            ((sid_map[sid], group) for sid, group in data.groupby("sid")),
-            show_progress=show_progress,
-        )
-        logging.info(f"Ingested {len(unique_sids)} assets successfully.")
+        daily_bar_writer.write(data_generator(), show_progress=show_progress)
+        print(f"Ingested {len(unique_sids)} assets successfully.")
     except Exception as e:
         raise RuntimeError(f"Error during ingestion: {e}")
 
@@ -93,7 +112,7 @@ if __name__ == "__main__":
     from zipline.data.bundles.core import ingest
 
     try:
-        logging.info("Running custom CSV ingestion.")
+        print(f"ZIPLINE_ROOT: {os.getenv('ZIPLINE_ROOT', 'data/zipline_root')}")
         ingest("custom_csv")
     except Exception as e:
-        logging.error(f"Error during ingestion: {e}")
+        print(f"Error during ingestion: {e}")

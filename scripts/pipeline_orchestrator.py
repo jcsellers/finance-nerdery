@@ -2,59 +2,88 @@ import logging
 import os
 
 import pandas as pd
-import synthetic_dataset_generator
 from align_data import align_datasets
-from create_sqlite_db import create_and_populate_unified_table
+from database_utils import ingest_file, validate_dataframe
 from fetch_and_clean_data import fetch_and_clean
 from fetch_fred_data import fetch_fred_data
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Base directory
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Paths
-TICKER_FILE = os.path.join(os.path.dirname(__file__), "../data/ticker_file.csv")
-DB_PATH = os.path.join(os.path.dirname(__file__), "../data/output/aligned_data.db")
+TICKER_PATH = os.path.join(BASE_DIR, "../data/ticker_file.csv")
+RAW_DIR = os.path.join(BASE_DIR, "../data/raw")
+CLEAN_DIR = os.path.join(BASE_DIR, "../data/cleaned")
+ALIGNED_DIR = os.path.join(BASE_DIR, "../data/aligned")
+DB_PATH = os.path.join(BASE_DIR, "../data/output/aligned_data.db")
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
-def load_symbols(file_path=TICKER_FILE):
-    try:
-        df = pd.read_csv(file_path)
-        fred_symbols = df[df["Type"] == "FRED"]["Symbol"].tolist()
-        yahoo_symbols = df[df["Type"] == "Ticker"]["Symbol"].tolist()
-        return fred_symbols, yahoo_symbols
-    except Exception as e:
-        logging.error(f"Error loading symbols: {e}")
-        return [], []
+def load_tickers(filepath=TICKER_PATH):
+    logging.info(f"Looking for ticker file at: {os.path.abspath(filepath)}")
+
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(
+            f"Ticker file not found at: {os.path.abspath(filepath)}"
+        )
+
+    tickers_df = pd.read_csv(filepath)
+    if "Type" not in tickers_df.columns or "Symbol" not in tickers_df.columns:
+        raise ValueError("Ticker file must contain 'Type' and 'Symbol' columns.")
+
+    yahoo_tickers = tickers_df[tickers_df["Type"] == "Ticker"]["Symbol"].tolist()
+    fred_tickers = tickers_df[tickers_df["Type"] == "FRED"]["Symbol"].tolist()
+
+    return yahoo_tickers, fred_tickers
+
+
+def fetch_and_save_raw_data(yahoo_tickers, fred_tickers):
+    logging.info("Fetching raw data...")
+    fetch_and_clean(tickers=yahoo_tickers)
+    fetch_fred_data(fred_tickers, output_dir=RAW_DIR)
+    logging.info("Raw data fetched and saved.")
+
+
+def align_and_save():
+    logging.info("Aligning raw data...")
+    align_datasets(input_dir=RAW_DIR, output_dir=ALIGNED_DIR)
+
+    aligned_files = [f for f in os.listdir(ALIGNED_DIR) if f.endswith("_aligned.csv")]
+    logging.info(f"Aligned files: {aligned_files}")
+
+
+def ingest_aligned_data():
+    logging.info(f"Ingesting aligned data into database: {DB_PATH}")
+    aligned_files = [f for f in os.listdir(ALIGNED_DIR) if f.endswith("_aligned.csv")]
+
+    for file in aligned_files:
+        filepath = os.path.join(ALIGNED_DIR, file)
+        try:
+            logging.info(f"Ingesting file: {filepath}")
+            dataframe = pd.read_csv(filepath)
+            validate_dataframe(dataframe)
+            ingest_file(filepath, DB_PATH)
+            logging.info(f"Ingested file: {filepath}")
+        except Exception as e:
+            logging.error(f"Error ingesting {file}: {e}")
 
 
 def main():
     logging.info("Starting pipeline...")
-    fred_symbols, yahoo_symbols = load_symbols()
 
-    fetch_fred_data(fred_symbols)
-    synthetic_dataset_generator.main()
-    fetch_and_clean(yahoo_symbols)
-    align_datasets()
+    yahoo_tickers, fred_tickers = load_tickers()
 
-    datasets = {
-        ticker: f"../data/aligned/{ticker}_cleaned.csv" for ticker in yahoo_symbols
-    }
-    datasets.update(
-        {symbol: f"../data/aligned/{symbol}.csv" for symbol in fred_symbols}
-    )
-    datasets.update(
-        {
-            "SYN_LINEAR": "../data/aligned/SYN_LINEAR_cleaned.csv",
-            "SYN_CASH": "../data/aligned/SYN_CASH_cleaned.csv",
-        }
-    )
+    fetch_and_save_raw_data(yahoo_tickers, fred_tickers)
+    align_and_save()
+    ingest_aligned_data()
 
-    create_and_populate_unified_table(DB_PATH, datasets)
     logging.info("Pipeline completed successfully.")
 
 
 if __name__ == "__main__":
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     main()

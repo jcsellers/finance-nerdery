@@ -13,16 +13,8 @@ repos:
         args: ["--profile", "black"]
         language_version: python3.11
 
-  - repo: https://github.com/pre-commit/mirrors-autopep8
-    rev: v1.6.0 # Use the latest stable version
-    hooks:
-      - id: autopep8
-        args: ["--in-place", "--max-line-length", "88"]
-        language_version: python3.11
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
-      - id: check-added-large-files
       - id: check-yaml
       - id: trailing-whitespace

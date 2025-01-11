@@ -16,8 +16,10 @@ def generate_linear_trend():
     """
     Generate a synthetic dataset with a linear trend.
     """
-    dates = pd.date_range(start="1990-01-02", end="2025-01-03", freq="D")
-    values = [i * 0.1 for i in range(len(dates))]
+    dates = pd.date_range(
+        start="1990-01-02", end="2025-01-03", freq="B"
+    )  # Business days only
+    values = [round(i * 0.1, 2) for i in range(len(dates))]  # Enforce precision
     df = pd.DataFrame({"Date": dates, "Value": values})
     return df
 
@@ -26,10 +28,23 @@ def generate_cash_dataset():
     """
     Generate a synthetic dataset with a constant value (cash).
     """
-    dates = pd.date_range(start="1990-01-02", end="2025-01-03", freq="D")
+    dates = pd.date_range(
+        start="1990-01-02", end="2025-01-03", freq="B"
+    )  # Business days only
     values = [100] * len(dates)
     df = pd.DataFrame({"Date": dates, "Value": values})
     return df
+
+
+def validate_synthetic_data(df, ticker):
+    """
+    Validate synthetic dataset conforms to the expected schema.
+    """
+    required_columns = {"Date", "Open", "High", "Low", "Close", "Volume", "ticker"}
+    if set(df.columns) != required_columns:
+        raise ValueError(
+            f"{ticker}: Missing or extra columns. Found: {set(df.columns)}"
+        )
 
 
 def main():
@@ -47,13 +62,14 @@ def main():
     df_cash["ticker"] = "SYN_CASH"
 
     # Map Value to the expected schema
-    for df in [df_linear, df_cash]:
+    for df, ticker in [(df_linear, "SYN_LINEAR"), (df_cash, "SYN_CASH")]:
         df["Open"] = df["Value"]
         df["Close"] = df["Value"]
         df["High"] = df["Value"]
         df["Low"] = df["Value"]
         df["Volume"] = 0  # Default value for Volume
         df.drop(columns=["Value"], inplace=True)
+        validate_synthetic_data(df, ticker)
 
     # Save synthetic datasets
     linear_path = os.path.join(ALIGNED_DIR, "SYN_LINEAR_cleaned.csv")
