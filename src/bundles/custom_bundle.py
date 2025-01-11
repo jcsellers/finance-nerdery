@@ -2,57 +2,61 @@ import os
 import sqlite3
 
 import pandas as pd
-from zipline.data.bundles import ingest, register
-from zipline.utils.cli import maybe_show_progress
+from zipline.data.bundles import register
 
 # Paths and configurations
-db_path = os.getenv("DB_PATH", "../data/output/aligned_data.db")  # Path to the database
-csv_temp_path = os.getenv(
-    "TEMP_CSV_PATH", "../data/output/zipline_temp_data.csv"
-)  # Temporary CSV path
+DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
+CSV_PATH = os.getenv("CSV_PATH", "data/output/zipline_temp_data.csv")
 
 
-def generate_csv_from_db(db_path=None, csv_path=None):
-    """Generate a CSV file from the SQLite database."""
-    db_path = db_path or os.getenv("DB_PATH", "../data/output/aligned_data.db")
-    csv_path = csv_path or os.getenv(
-        "TEMP_CSV_PATH", "../data/output/zipline_temp_data.csv"
-    )
-
-    print(f"DB_PATH: {db_path}")
-    print(f"TEMP_CSV_PATH: {csv_path}")
-
-    connection = sqlite3.connect(db_path)
+def fetch_and_prepare_data():
+    """Fetch data from the database and prepare for ingestion."""
+    print(f"DB_PATH: {DB_PATH}")
+    connection = sqlite3.connect(DB_PATH)
     query = """
-    SELECT
-        ticker AS sid,
-        Date AS date,
-        Open AS open,
-        High AS high,
-        Low AS low,
-        Close AS close,
-        Volume AS volume
+    SELECT ticker AS sid, Date AS date, Open AS open, High AS high, Low AS low, Close AS close, Volume AS volume
     FROM data;
     """
-    try:
-        data_df = pd.read_sql_query(query, connection)
-        data_df["date"] = pd.to_datetime(data_df["date"])
-        print(f"Data fetched: {data_df.head()}")
-    except Exception as e:
-        print(f"Error fetching data: {e}")
-        raise
-
-    try:
-        data_df.to_csv(csv_path, index=False)
-        print(f"CSV written to {csv_path}")
-    except Exception as e:
-        print(f"Error writing CSV: {e}")
-        raise
-
+    data = pd.read_sql_query(query, connection)
     connection.close()
 
-#.
-# Custom Zipline bundle
+    print("Raw data fetched from the database:")
+    print(data.head())
+
+    # Validate columns
+    required_columns = {"sid", "date", "open", "high", "low", "close", "volume"}
+    missing_columns = required_columns - set(data.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+
+    print("All required columns are present.")
+
+    # Drop rows with invalid dates or placeholder data
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    data = data.dropna(subset=["date"])
+    data = data[data["date"] >= pd.Timestamp("1990-01-02")]  # Filter dates before 1990
+    data = data[data["date"] <= pd.Timestamp("2025-01-03")]  # Filter dates after 2025
+
+    # Check for invalid numeric values
+    numeric_columns = ["open", "high", "low", "close", "volume"]
+    for col in numeric_columns:
+        invalid_values = data[data[col] < 0]
+        if not invalid_values.empty:
+            print(f"Warning: Found invalid values in column '{col}':")
+            print(invalid_values)
+
+        data = data[data[col] >= 0]  # Filter out invalid numeric values
+
+    print("Data after cleaning:")
+    print(data.head())
+
+    # Save cleaned data to a CSV file
+    data.to_csv(CSV_PATH, index=False)
+    print(f"Equity data successfully written to {CSV_PATH}")
+
+    return data
+
+
 def custom_bundle(
     environ,
     asset_db_writer,
@@ -66,43 +70,49 @@ def custom_bundle(
     show_progress,
     output_dir,
 ):
-    """Custom data bundle to ingest CSV data."""
-    # Generate CSV from database
-    generate_csv_from_db()
+    """Custom bundle for ingesting data."""
+    print("Starting data ingestion process.")
 
-    # Load the CSV into a DataFrame
-    data = pd.read_csv(csv_temp_path, parse_dates=["date"])
+    # Fetch and prepare data
+    data = fetch_and_prepare_data()
 
-    # Ensure column names are compatible
-    data = data.rename(
-        columns={
-            "date": "date",
-            "open": "open",
-            "high": "high",
-            "low": "low",
-            "close": "close",
-            "volume": "volume",
-            "sid": "sid",
-        }
-    )
+    # Align data to the trading calendar
+    trading_days = calendar.sessions_in_range(start_session, end_session)
 
-    # Adjust data types
-    data["sid"] = data["sid"].astype("category").cat.codes  # Map tickers to integers
+    # Map assets to integer IDs
+    unique_sids = data["sid"].unique()
+    sid_map = {sid: i for i, sid in enumerate(unique_sids)}
+    print(f"Asset mapping: {sid_map}")
 
-    # Group by 'sid' and write daily bar data
+    # Group data by sid and align dates to the trading calendar
     def data_generator():
-        for sid, df in data.groupby("sid"):
-            yield sid, df
+        for sid, group in data.groupby("sid"):
+            group["date"] = pd.to_datetime(group["date"])
+            group = group.set_index("date").reindex(trading_days).reset_index()
+            group.fillna(method="ffill", inplace=True)
+            group.fillna(method="bfill", inplace=True)
 
-    daily_bar_writer.write(
-        data_generator(), show_progress=maybe_show_progress(show_progress)
-    )
+            # Drop rows with still-missing data
+            group.dropna(inplace=True)
+
+            yield sid_map[sid], group
+
+    # Write data to daily bar writer
+    try:
+        daily_bar_writer.write(data_generator(), show_progress=show_progress)
+        print(f"Ingested {len(unique_sids)} assets successfully.")
+    except Exception as e:
+        raise RuntimeError(f"Error during ingestion: {e}")
 
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)
 
 if __name__ == "__main__":
-    # Ingest the bundle
-    os.environ["ZIPLINE_ROOT"] = "../data/zipline_root"  # Set Zipline's root directory
-    ingest("custom_csv")
+    from zipline.data.bundles.core import ingest
+
+    try:
+        print(f"ZIPLINE_ROOT: {os.getenv('ZIPLINE_ROOT', 'data/zipline_root')}")
+        ingest("custom_csv")
+    except Exception as e:
+        print(f"Error during ingestion: {e}")

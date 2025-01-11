@@ -31,6 +31,13 @@ def align_datasets(input_dir="../data/cleaned", output_dir="../data/aligned"):
             df["Date"] = pd.to_datetime(df["Date"])
             df.set_index("Date", inplace=True)
 
+            # Handle ticker assignment
+            ticker = (
+                df["ticker"].iloc[0]
+                if "ticker" in df.columns
+                else os.path.splitext(file)[0]
+            )
+
             # Reindex and fill missing values
             df = df.reindex(common_dates)
             df.ffill(inplace=True)
@@ -40,9 +47,14 @@ def align_datasets(input_dir="../data/cleaned", output_dir="../data/aligned"):
             df.reset_index(inplace=True)
             df.rename(columns={"index": "Date"}, inplace=True)
 
-            # Append `_cleaned` to the output filename
-            base_filename = os.path.splitext(file)[0]
-            aligned_filepath = os.path.join(output_dir, f"{base_filename}_cleaned.csv")
+            # Add the 'ticker' column back
+            df["ticker"] = ticker
+
+            # Define aligned filepath and avoid duplication
+            aligned_filepath = os.path.join(output_dir, f"{ticker}_aligned.csv")
+            if os.path.exists(aligned_filepath):
+                os.remove(aligned_filepath)
+
             df.to_csv(aligned_filepath, index=False)
             logging.info(f"Aligned and saved: {aligned_filepath}")
 

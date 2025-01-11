@@ -4,16 +4,15 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
+      - feature/**
   pull_request:
     branches:
       - main
-      - 'feature/**'
+      - feature/**
 
 jobs:
   lint:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -21,37 +20,31 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install linting dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 isort black autoflake
+          pip install flake8 isort black autoflake autopep8
 
       - name: Run autoflake
         run: |
-          autoflake --remove-unused-variables --remove-all-unused-imports --recursive --in-place src tests
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src tests
+          autoflake --remove-unused-variables --remove-all-unused-imports --recursive --in-place src tests scripts
 
-      - name: Run Black and isort in fix mode
+      - name: Run autopep8
         run: |
-          black src tests
-          isort src tests
+          autopep8 --max-line-length 88 --in-place --recursive src tests scripts
 
-      - name: Run isort (Import Sorting)
-        run: isort src tests --check --diff
+      - name: Run black
+        run: |
+          black --line-length 88 src tests scripts
 
-      - name: Run black (Code Formatter)
-        run: black src tests --check --diff
-
-      - name: Run Linting
-        run: flake8 src tests
+      - name: Run isort
+        run: |
+          isort src tests scripts
 
   test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -59,22 +52,36 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Set PYTHONPATH
         run: |
-          echo "PYTHONPATH=$(pwd)/scripts:$(pwd)/src" >> $GITHUB_ENV
-          cp .env.test .env
-     
-      - name: Run Database Validation
-        run: python scripts/database_validation.py
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run all tests
+      - name: Set Environment Variables
+        run: |
+          echo "DB_PATH=$(pwd)/data/output/aligned_data.db" >> $GITHUB_ENV
+          echo "CSV_PATH=$(pwd)/data/output/generated_data.csv" >> $GITHUB_ENV
+          echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
+          export PYTHONPATH=$(pwd)/scripts:$(pwd)/src:$PYTHONPATH
+
+      - name: Generate CSV Data
+        run: |
+          mkdir -p data/output
+          python scripts/generate_csv.py
+
+      - name: Register and Ingest Custom CSV Bundle
+        run: |
+          python src/bundles/custom_bundle.py
+          zipline ingest -b custom_csv
+
+      - name: Validate Ingestion
+        run: |
+          python scripts/validate_zipline_ingestion.py
+
+      - name: Run Tests
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
-          mkdir -p data/output
           pytest tests/

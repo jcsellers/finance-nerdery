@@ -40,13 +40,14 @@ def fetch_fred_data(fred_symbols, output_dir="../data/economic"):
 
             # Map FRED data to the expected schema
             df.reset_index(inplace=True)
+            df["ticker"] = symbol  # Add the ticker column
             df["Open"] = df["Value"]
             df["Close"] = df["Value"]
             df["High"] = df["Value"]
             df["Low"] = df["Value"]
             df["Volume"] = 0  # Default value for Volume
             df = df[
-                ["Date", "Open", "Close", "High", "Low", "Volume"]
+                ["Date", "ticker", "Open", "Close", "High", "Low", "Volume"]
             ]  # Reorder columns
 
             filepath = os.path.join(output_dir, f"{symbol}.csv")
@@ -56,6 +57,17 @@ def fetch_fred_data(fred_symbols, output_dir="../data/economic"):
             logging.error(f"Error fetching FRED series {symbol}: {e}")
 
 
+def main():
+    """
+    Fetch FRED data from a list of symbols provided in the pipeline.
+    """
+    # Example: Symbols can be dynamically passed by the pipeline
+    fred_symbols = [
+        "BAMLH0A0HYM2",
+        "DGS10",
+    ]  # Replace this with the actual pipeline input
+    fetch_fred_data(fred_symbols)
+
+
 if __name__ == "__main__":
-    # Example usage
-    fetch_fred_data(["GDP", "UNRATE", "CPI"])
+    main()
