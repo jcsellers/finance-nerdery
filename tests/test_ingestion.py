@@ -1,32 +1,58 @@
-from .create_test_db import create_test_db
-from src.bundles.custom_bundle import generate_csv_from_db
+import sqlite3
 import pandas as pd
-
-import sys
-
-print(sys.path)
+from src.bundles.custom_bundle import fetch_and_prepare_data
 
 
-# from tests.create_test_db import create_test_db
-
-
-def test_csv_generation_with_deterministic_data(tmp_path):
-    """Test CSV generation from deterministic test database."""
-    # Define paths
-    test_db_path = tmp_path / "deterministic_test_data.db"
+def test_fetch_and_prepare_data(tmp_path):
+    """Test data fetching and preparation from SQLite database."""
+    test_db_path = tmp_path / "test_aligned_data.db"
     temp_csv_path = tmp_path / "temp_data.csv"
 
-    # Create the test database
-    create_test_db(db_path=test_db_path)
+    connection = sqlite3.connect(test_db_path)
+    cursor = connection.cursor()
 
-    # Generate CSV
-    generate_csv_from_db(db_path=str(test_db_path), csv_path=str(temp_csv_path))
+    # Create the `data` table schema
+    cursor.execute(
+        """
+        CREATE TABLE data (
+            ticker TEXT,
+            Date TEXT,
+            Open REAL,
+            High REAL,
+            Low REAL,
+            Close REAL,
+            Volume INTEGER
+        );
+        """
+    )
 
-    # Validate file existence
+    # Insert test data
+    cursor.executemany(
+        """
+        INSERT INTO data (ticker, Date, Open, High, Low, Close, Volume)
+        VALUES (?, ?, ?, ?, ?, ?, ?);
+        """,
+        [
+            ("TEST", "2023-01-01", 100, 110, 90, 105, 1000),
+            ("FRED", "2023-01-02", 3.0, 3.0, 3.0, 3.0, 0),
+        ],
+    )
+
+    connection.commit()
+    connection.close()
+
+    # Replace environment variables for testing
+    os.environ["DB_PATH"] = str(test_db_path)
+    os.environ["CSV_PATH"] = str(temp_csv_path)
+
+    # Fetch and prepare data
+    data = fetch_and_prepare_data()
+
+    # Validate the CSV
     assert temp_csv_path.exists(), f"Expected CSV file {temp_csv_path} not found."
-
-    # Validate CSV contents
     df = pd.read_csv(temp_csv_path)
-    assert len(df) == 5  # 5 rows from the deterministic dataset
+    assert len(df) == 2
     assert df.iloc[0]["sid"] == "TEST"
+    assert df.iloc[1]["sid"] == "FRED"
     assert df.iloc[0]["close"] == 105
+    assert df.iloc[1]["close"] == 3.0
