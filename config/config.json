@@ -1,0 +1,47 @@
+{
+    "tickers": {
+        "Yahoo Finance": [
+            "SPY",
+            "SSO",
+            "UPRO",
+            "GLD",
+            "TLT"
+        ],
+        "FRED": [
+            "BAMLH0A0HYM2",
+            "DGS10"
+        ]
+    },
+    "aliases": {
+        "FRED": {
+            "BAMLH0A0HYM2": "OAS Spread",
+            "DGS10": "10 Year Treasury Yield"
+        }
+    },
+    "date_ranges": {
+        "start_date": "2020-01-01",
+        "end_date": "current"
+    },
+    "storage": {
+        "SQLite": "data/finance_data.db",
+        "CSV": "data/csv_files/",
+        "output_dir": "output/"
+    },
+    "settings": {
+        "retry_count": 3,
+        "log_level": "verbose",
+        "timezone": "UTC"
+    },
+    "FRED": {
+        "api_key": "your_fred_api_key"
+    },
+    "Synthetic Data": {
+        "syn_cash": {
+            "start_value": 1.0
+        },
+        "syn_linear": {
+            "start_value": 1.0,
+            "growth_rate": 0.01
+        }
+    }
+}
