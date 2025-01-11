@@ -70,8 +70,16 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     # Load the CSV into a DataFrame
     data = pd.read_csv(csv_temp_path, parse_dates=["date"])
 
+    # Debugging: Log initial data
+    print(f"Initial data rows: {len(data)}")
+    print(f"Initial data:\n{data.head()}")
+
     # Filter invalid and out-of-range dates
     data = data.dropna(subset=["date"])  # Drop rows where date parsing failed
+
+    # Remove `1970-01-01` placeholder rows
+    invalid_placeholder_date = pd.Timestamp("1970-01-01")
+    data = data[data["date"] != invalid_placeholder_date]
 
     # Fetch the full range of dates from the database
     db_connection = sqlite3.connect(db_path)
@@ -101,7 +109,7 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     # Keep only valid sessions
     data = data[data["date"].isin(valid_sessions)]
 
-    # Debugging: Print summary of valid data
+    # Debugging: Log filtered data
     print(f"Validated data:\n{data.head()}")
     print(f"Total rows after validation: {len(data)}")
 
@@ -122,9 +130,9 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     data["sid"] = data["sid"].astype("category").cat.codes
 
     # Final validation: Ensure no invalid dates are passed
-    invalid_rows = data[(data["date"] < db_start_date) | (data["date"] > db_end_date)]
+    invalid_rows = data[data["date"] == invalid_placeholder_date]
     if not invalid_rows.empty:
-        print(f"Invalid rows detected:\n{invalid_rows}")
+        print(f"Invalid rows detected in final data:\n{invalid_rows}")
         raise ValueError("Invalid rows detected in final data.")
 
     # Group by 'sid' and write daily bar data
