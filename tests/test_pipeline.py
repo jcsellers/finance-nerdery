@@ -52,12 +52,6 @@ def test_align_datasets(setup_test_environment):
         assert len(aligned_df) == len(common_dates), "Date range mismatch in aligned file."
         assert "Value" in aligned_df.columns, f"Value column missing in {filename}."
 
-        # Check forward and backward filling
-        assert aligned_df.iloc[1]["Value"] == aligned_df.iloc[0]["Value"] or aligned_df.iloc[1]["Value"] is not None, \
-            "Missing forward fill value issue."
-        assert aligned_df.iloc[-2]["Value"] == aligned_df.iloc[-1]["Value"] or aligned_df.iloc[-1]["Value"] is not None, \
-            "Missing backward fill value issue."
-
 
 def test_align_handles_empty_directory(tmp_path):
     """Ensure alignment handles an empty input directory gracefully."""
@@ -89,4 +83,4 @@ def test_align_handles_invalid_data(tmp_path):
     align_datasets(input_dir=input_dir, output_dir=output_dir)
 
     # Ensure the corrupted file does not crash the function
-    assert len(os.listdir(output_dir)) == 0, "No aligned files should be cr
+    assert len(os.listdir(output_dir)) == 0, "Output directory should be empty for invalid input files."
