@@ -26,7 +26,7 @@ jobs:
           pip install flake8 isort black autoflake
       - name: Run autoflake
         run: |
-          autoflake --remove-unused-variables --remove-all-unused-imports --recursive
+          autoflake --remove-unused-variables --remove-all-unused-imports --recursive src tests scripts
           --in-place src tests scripts
       - name: Run black
         run: black src tests scripts
