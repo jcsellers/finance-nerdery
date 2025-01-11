@@ -39,11 +39,18 @@ def generate_csv_from_db(db_path=None, csv_path=None):
     """
     try:
         data_df = pd.read_sql_query(query, connection)
-        data_df["date"] = pd.to_datetime(data_df["date"], errors="coerce")  # Coerce invalid dates
-        print(f"Data fetched: {data_df.head()}")
+        print(f"Data fetched from DB:\n{data_df.head()}")
+        if data_df["date"].isnull().any():
+            print("WARNING: Null dates detected in the database.")
     except Exception as e:
         print(f"Error fetching data: {e}")
         raise
+
+    # Drop null dates early
+    data_df["date"] = pd.to_datetime(data_df["date"], errors="coerce")
+    data_df = data_df.dropna(subset=["date"])  # Drop invalid dates
+
+    print(f"Data after dropping null dates:\n{data_df.head()}")
 
     try:
         data_df.to_csv(csv_path, index=False)
@@ -61,27 +68,20 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     """Custom data bundle to ingest CSV data."""
     generate_csv_from_db()
 
-    # Ensure the CSV file exists
     if not os.path.exists(csv_temp_path):
         raise FileNotFoundError(f"CSV file not found: {csv_temp_path}")
 
     print(f"CSV file ready for ingestion: {csv_temp_path}")
 
-    # Load the CSV into a DataFrame
     data = pd.read_csv(csv_temp_path, parse_dates=["date"])
-
-    # Debugging: Log initial data
     print(f"Initial data rows: {len(data)}")
-    print(f"Initial data:\n{data.head()}")
 
-    # Filter invalid and out-of-range dates
-    data = data.dropna(subset=["date"])  # Drop rows where date parsing failed
-
-    # Remove `1970-01-01` placeholder rows
+    # Remove invalid placeholder rows (e.g., 1970-01-01)
     invalid_placeholder_date = pd.Timestamp("1970-01-01")
     data = data[data["date"] != invalid_placeholder_date]
+    print(f"Data after filtering placeholder dates:\n{data.head()}")
 
-    # Fetch the full range of dates from the database
+    # Fetch the database's date range
     db_connection = sqlite3.connect(db_path)
     db_date_range = pd.read_sql_query(
         "SELECT MIN(Date) AS start_date, MAX(Date) AS end_date FROM data;", db_connection
@@ -89,58 +89,35 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     db_connection.close()
     db_start_date = pd.to_datetime(db_date_range["start_date"].iloc[0])
     db_end_date = pd.to_datetime(db_date_range["end_date"].iloc[0])
-
     print(f"Database date range: {db_start_date} to {db_end_date}")
 
-    # Ensure dates are within the database range
+    # Ensure dates are within range
     data = data[(data["date"] >= db_start_date) & (data["date"] <= db_end_date)]
-
-    # Further restrict dates to the simulation range
     data = data[(data["date"] >= start_session) & (data["date"] <= end_session)]
 
-    # Align with valid trading calendar sessions
     valid_sessions = calendar.sessions_in_range(start_session, end_session)
-    extra_dates = data[~data["date"].isin(valid_sessions)]  # Identify rows with invalid dates
-
-    # Debugging: Print problematic rows
+    extra_dates = data[~data["date"].isin(valid_sessions)]
     if not extra_dates.empty:
         print(f"Extra sessions:\n{extra_dates}")
 
-    # Keep only valid sessions
     data = data[data["date"].isin(valid_sessions)]
+    print(f"Validated data rows: {len(data)}")
 
-    # Debugging: Log filtered data
-    print(f"Validated data:\n{data.head()}")
-    print(f"Total rows after validation: {len(data)}")
-
-    # Ensure column names are compatible
-    data = data.rename(
-        columns={
-            "date": "date",
-            "open": "open",
-            "high": "high",
-            "low": "low",
-            "close": "close",
-            "volume": "volume",
-            "sid": "sid",
-        }
-    )
-
-    # Adjust data types
+    # Ensure column names and data types are compatible
+    data = data.rename(columns={"date": "date", "sid": "sid"})
     data["sid"] = data["sid"].astype("category").cat.codes
 
-    # Final validation: Ensure no invalid dates are passed
-    invalid_rows = data[data["date"] == invalid_placeholder_date]
-    if not invalid_rows.empty:
-        print(f"Invalid rows detected in final data:\n{invalid_rows}")
-        raise ValueError("Invalid rows detected in final data.")
-
-    # Group by 'sid' and write daily bar data
+    # Debugging: Loop detection
+    loop_count = 0
     def data_generator():
+        nonlocal loop_count
         for sid, df in data.groupby("sid"):
+            loop_count += 1
+            if loop_count > len(data):
+                raise RuntimeError("Infinite loop detected in data generator.")
             yield sid, df
 
-    # Pass the generator and `show_progress` directly to `daily_bar_writer.write`
+    # Pass data to Zipline's writer
     daily_bar_writer.write(data_generator(), show_progress=show_progress)
 
 
@@ -151,7 +128,6 @@ if __name__ == "__main__":
     os.environ["ZIPLINE_ROOT"] = os.path.abspath("data/zipline_root")
     print(f"ZIPLINE_ROOT: {os.environ['ZIPLINE_ROOT']}")
 
-    # Ingest the bundle
     try:
         ingest("custom_csv")
         print("Bundle ingestion completed successfully.")
