@@ -17,7 +17,7 @@ def validate_columns(data):
     print("All required columns are present.")
 
 def fetch_and_prepare_data():
-    """Fetch data from the database and prepare for ingestion."""
+    """Fetch data from the database and prepare it for ingestion."""
     print(f"DB_PATH: {DB_PATH}")
     connection = sqlite3.connect(DB_PATH)
     query = """
@@ -32,6 +32,7 @@ def fetch_and_prepare_data():
     FROM data;
     """
     try:
+        # Fetch data
         data = pd.read_sql_query(query, connection)
         connection.close()
         print("Raw data fetched from the database:")
@@ -45,13 +46,23 @@ def fetch_and_prepare_data():
         print("Data after dropping null dates:")
         print(data.head())
 
+        # Filter placeholder rows
+        data = data[
+            (data["open"] != 0) &
+            (data["high"] != 0) &
+            (data["low"] != 0) &
+            (data["close"] != 0)
+        ]
+        print("Data after filtering placeholder rows:")
+        print(data.head())
+
         # Write cleaned data to CSV
         data.to_csv(CSV_PATH, index=False)
         print(f"Equity data successfully written to {CSV_PATH}")
 
         return data
     except Exception as e:
-        print(f"Error during data fetch: {e}")
+        print(f"Error during data fetch and preparation: {e}")
         raise
 
 def custom_bundle(
