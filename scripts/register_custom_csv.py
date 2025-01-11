@@ -2,6 +2,7 @@ import os
 from zipline.data.bundles import register
 from zipline.data.bundles.csvdir import csvdir_equities
 
+
 def register_custom_csv():
     """
     Registers a custom CSV data bundle for Zipline.
@@ -13,11 +14,12 @@ def register_custom_csv():
         raise FileNotFoundError(f"CSV directory does not exist: {csvdir_path}")
 
     register(
-        'custom_csv',
-        csvdir_equities(['daily'], csvdir_path),
-        calendar_name='NYSE',  # Adjust as needed
+        "custom_csv",
+        csvdir_equities(["daily"], csvdir_path),
+        calendar_name="NYSE",  # Adjust as needed
     )
     print("Custom CSV bundle registered successfully.")
+
 
 if __name__ == "__main__":
     try:

@@ -6,6 +6,7 @@ from zipline.data import bundles
 def setup_bundle():
     """Ensure the custom bundle is ingested."""
     import os
+
     os.system("python src/bundles/custom_bundle.py")
 
 

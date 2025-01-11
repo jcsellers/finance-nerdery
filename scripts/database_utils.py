@@ -2,6 +2,7 @@ import sqlite3
 import os
 from pandas import DataFrame
 
+
 def save_to_database(dataframe: DataFrame, database_path: str):
     """
     Saves a DataFrame to the SQLite database. It first deletes any existing data for the
@@ -27,6 +28,7 @@ def save_to_database(dataframe: DataFrame, database_path: str):
         # Save the DataFrame to the database
         dataframe.to_sql("prices", conn, if_exists="append", index=False)
 
+
 def validate_database_schema(database_path: str):
     """
     Validates that the SQLite database contains the required schema.
@@ -45,7 +47,10 @@ def validate_database_schema(database_path: str):
 
     missing_tables = required_tables - existing_tables
     if missing_tables:
-        raise ValueError(f"Database is missing required tables: {', '.join(missing_tables)}")
+        raise ValueError(
+            f"Database is missing required tables: {', '.join(missing_tables)}"
+        )
+
 
 def fetch_data_from_database(database_path: str, query: str):
     """

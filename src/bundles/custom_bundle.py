@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 from zipline.data.bundles import register
 from src.utils.data_validation import validate_columns, validate_asset_metadata
+
 # Paths and configurations
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
 CSV_PATH = os.getenv("CSV_PATH", "data/output/zipline_temp_data.csv")
@@ -68,6 +69,7 @@ def custom_bundle(
         print(f"Ingested {len(unique_sids)} assets successfully.")
     except Exception as e:
         raise RuntimeError(f"Error during ingestion: {e}")
+
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)

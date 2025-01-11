@@ -41,7 +41,9 @@ def test_align_datasets(setup_test_environment):
     # Verify output files are created
     aligned_files = [f"{os.path.splitext(f)[0]}_cleaned.csv" for f in files_data.keys()]
     for aligned_file in aligned_files:
-        assert (output_dir / aligned_file).exists(), f"Aligned file {aligned_file} not found."
+        assert (
+            output_dir / aligned_file
+        ).exists(), f"Aligned file {aligned_file} not found."
 
     # Validate contents of aligned files
     for filename in aligned_files:
@@ -49,7 +51,9 @@ def test_align_datasets(setup_test_environment):
 
         # Check that the aligned file has a common date range
         common_dates = pd.date_range(start="1990-01-02", end="2025-01-03")
-        assert len(aligned_df) == len(common_dates), "Date range mismatch in aligned file."
+        assert len(aligned_df) == len(
+            common_dates
+        ), "Date range mismatch in aligned file."
         assert "Value" in aligned_df.columns, f"Value column missing in {filename}."
 
 
@@ -64,7 +68,9 @@ def test_align_handles_empty_directory(tmp_path):
     align_datasets(input_dir=input_dir, output_dir=output_dir)
 
     # Ensure no files are created in the output directory
-    assert len(os.listdir(output_dir)) == 0, "Output directory should be empty for empty input directory."
+    assert (
+        len(os.listdir(output_dir)) == 0
+    ), "Output directory should be empty for empty input directory."
 
 
 def test_align_handles_invalid_data(tmp_path):
@@ -83,4 +89,6 @@ def test_align_handles_invalid_data(tmp_path):
     align_datasets(input_dir=input_dir, output_dir=output_dir)
 
     # Ensure the corrupted file does not crash the function
-    assert len(os.listdir(output_dir)) == 0, "Output directory should be empty for invalid input files."
+    assert (
+        len(os.listdir(output_dir)) == 0
+    ), "Output directory should be empty for invalid input files."

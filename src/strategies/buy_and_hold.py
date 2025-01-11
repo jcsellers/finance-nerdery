@@ -18,7 +18,10 @@ def handle_data(context, data):
 
 
 def run_buy_and_hold(
-    asset_symbol="TEST", start_date="2023-01-01", end_date="2023-01-05", capital_base=100000
+    asset_symbol="TEST",
+    start_date="2023-01-01",
+    end_date="2023-01-05",
+    capital_base=100000,
 ):
     """Run the buy-and-hold strategy with configurable parameters."""
     start = datetime.strptime(start_date, "%Y-%m-%d")

@@ -4,7 +4,6 @@ import os
 from src.bundles.custom_bundle import fetch_and_prepare_data
 
 
-
 def test_fetch_and_prepare_data(tmp_path):
     """Test data fetching and preparation from SQLite database."""
     test_db_path = tmp_path / "test_aligned_data.db"

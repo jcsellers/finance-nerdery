@@ -6,6 +6,7 @@ from src.strategies.buy_and_hold import run_buy_and_hold
 def setup_bundle():
     """Ensure the custom bundle is ingested."""
     import os
+
     os.system("python src/bundles/custom_bundle.py")
 
 

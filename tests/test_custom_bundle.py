@@ -2,6 +2,7 @@ import sqlite3
 import pandas as pd
 from src.bundles.custom_bundle import fetch_and_prepare_data, validate_columns
 
+
 def test_fetch_and_prepare_data(tmp_path):
     """Test data fetching and preparation for ingestion."""
     test_db_path = tmp_path / "test_aligned_data.db"

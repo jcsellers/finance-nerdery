@@ -6,6 +6,7 @@ import os
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
 CSV_PATH = os.getenv("CSV_PATH", "data/output/generated_data.csv")
 
+
 def validate_and_clean_data(data):
     """Ensure data conforms to required structure."""
     required_columns = {"sid", "date", "open", "high", "low", "close", "volume"}
@@ -23,6 +24,7 @@ def validate_and_clean_data(data):
         & (data["volume"] >= 0)
     ]
     return data
+
 
 def generate_csv_from_db():
     """Generate a CSV file for Zipline ingestion."""
@@ -62,6 +64,7 @@ def generate_csv_from_db():
     except Exception as e:
         print(f"Error during data generation: {e}")
         raise
+
 
 if __name__ == "__main__":
     try:
