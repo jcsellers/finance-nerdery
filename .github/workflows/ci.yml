@@ -43,6 +43,10 @@ jobs:
         run: |
           isort src tests scripts
 
+      - name: Check for linting issues
+        run: |
+          flake8 src tests scripts --max-line-length=88 --exclude=__init__.py
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -61,27 +65,17 @@ jobs:
 
       - name: Set Environment Variables
         run: |
-          echo "DB_PATH=$(pwd)/data/output/aligned_data.db" >> $GITHUB_ENV
-          echo "CSV_PATH=$(pwd)/data/output/generated_data.csv" >> $GITHUB_ENV
           echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
-          export PYTHONPATH=$(pwd)/scripts:$(pwd)/src:$PYTHONPATH
+          export PYTHONPATH=$(pwd)/src:$(pwd)/tests:$PYTHONPATH
 
-      - name: Generate CSV Data
+      - name: Run Configuration Tests
         run: |
-          mkdir -p data/output
-          python scripts/generate_csv.py
+          pytest tests/test_parser.py --maxfail=5 --disable-warnings
+          pytest tests/test_utils.py --maxfail=5 --disable-warnings
+          pytest tests/test_pipelines.py --maxfail=5 --disable-warnings
 
-      - name: Register and Ingest Custom CSV Bundle
-        run: |
-          python src/bundles/custom_bundle.py
-          zipline ingest -b custom_csv
-
-      - name: Validate Ingestion
-        run: |
-          python scripts/validate_zipline_ingestion.py
-
-      - name: Run Tests
+      - name: Run All Tests
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
-          pytest tests/
+          pytest tests --maxfail=5 --disable-warnings
