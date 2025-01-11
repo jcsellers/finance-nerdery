@@ -31,22 +31,28 @@ def generate_csv(db_path=None, csv_path=None):
     SELECT
         ticker AS sid,
         Date AS date,
-        Open AS open,
-        High AS high,
-        Low AS low,
-        Close AS close,
-        Volume AS volume
+        Open AS Open,
+        High AS High,
+        Low AS Low,
+        Close AS Close,
+        Volume AS Volume
     FROM data;
     """
     try:
         data_df = pd.read_sql_query(query, connection)
         data_df["date"] = pd.to_datetime(data_df["date"])
         print(f"Data fetched from database:\n{data_df.head()}")
+        print(f"Columns in DataFrame: {data_df.columns.tolist()}")
     except Exception as e:
         print(f"Error fetching data: {e}")
         raise
 
     # Validate data: remove rows with zero prices
+    required_columns = ["High", "Low", "Open", "Close"]
+    for column in required_columns:
+        if column not in data_df.columns:
+            raise KeyError(f"Missing column in DataFrame: {column}")
+
     data_df = data_df[
         (data_df["High"] != 0) &
         (data_df["Low"] != 0) &
