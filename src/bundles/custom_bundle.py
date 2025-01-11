@@ -1,21 +1,24 @@
 import os
 import sqlite3
 import pandas as pd
-from zipline.data.bundles import register, ingest
+from zipline.data.bundles import register
 from zipline.utils.cli import maybe_show_progress
 
 # Paths and configurations
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
 CSV_PATH = os.getenv("CSV_PATH", "data/output/zipline_temp_data.csv")
 
+def validate_columns(data):
+    """Ensure all required columns are present."""
+    required_columns = {"sid", "date", "open", "high", "low", "close", "volume"}
+    missing_columns = required_columns - set(data.columns)
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    print("All required columns are present.")
 
-def generate_csv_from_db():
-    """
-    Generate a CSV file from the SQLite database.
-    """
-    if not os.path.exists(DB_PATH):
-        raise FileNotFoundError(f"Database not found: {DB_PATH}")
-
+def fetch_and_prepare_data():
+    """Fetch data from the database and prepare for ingestion."""
+    print(f"DB_PATH: {DB_PATH}")
     connection = sqlite3.connect(DB_PATH)
     query = """
     SELECT
@@ -30,34 +33,26 @@ def generate_csv_from_db():
     """
     try:
         data = pd.read_sql_query(query, connection)
-        data["date"] = pd.to_datetime(data["date"])
-        print(f"Raw data fetched from the database:\n{data.head()}")
-    except Exception as e:
-        raise RuntimeError(f"Error reading data from database: {e}")
-    finally:
         connection.close()
+        print("Raw data fetched from the database:")
+        print(data.head())
 
-    # Drop null dates and filter placeholder rows
-    data = data.dropna(subset=["date"])
-    data = data[(data["High"] != 0) & (data["Low"] != 0) & (data["Volume"] != 0)]
-    print(f"Validated data rows: {len(data)}")
+        # Validate columns
+        validate_columns(data)
 
-    # Write to CSV
-    os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
-    data.to_csv(CSV_PATH, index=False)
-    print(f"Equity data successfully written to {CSV_PATH}")
-    return data
+        # Drop rows with null dates
+        data = data.dropna(subset=["date"])
+        print("Data after dropping null dates:")
+        print(data.head())
 
+        # Write cleaned data to CSV
+        data.to_csv(CSV_PATH, index=False)
+        print(f"Equity data successfully written to {CSV_PATH}")
 
-def generate_asset_mapping(data):
-    """
-    Create a mapping of assets to integer IDs for Zipline ingestion.
-    """
-    unique_assets = data["sid"].unique()
-    asset_map = {asset: idx for idx, asset in enumerate(unique_assets)}
-    print(f"Asset mapping: {asset_map}")
-    return data, asset_map
-
+        return data
+    except Exception as e:
+        print(f"Error during data fetch: {e}")
+        raise
 
 def custom_bundle(
     environ,
@@ -72,45 +67,34 @@ def custom_bundle(
     show_progress,
     output_dir,
 ):
-    """
-    Custom Zipline bundle to ingest data.
-    """
-    # Step 1: Generate CSV
-    data = generate_csv_from_db()
+    """Custom data bundle for ingestion."""
+    # Fetch and prepare data
+    data = fetch_and_prepare_data()
 
-    # Step 2: Generate asset mapping
-    data, asset_map = generate_asset_mapping(data)
+    # Map assets to integer IDs
+    unique_sids = data["sid"].unique()
+    sid_map = {sid: i for i, sid in enumerate(unique_sids)}
+    print(f"Asset mapping: {sid_map}")
 
-    # Step 3: Create data generator
+    # Group data by sid
     def data_generator():
-        for sid, df in data.groupby("sid"):
-            yield asset_map[sid], df
+        for sid, group in data.groupby("sid"):
+            yield sid_map[sid], group
 
-    # Step 4: Wrap the generator for manual progress tracking
-    def progress_generator(generator, total):
-        for count, item in enumerate(generator, start=1):
-            yield item
-            print(f"Progress: {count}/{total} items processed", end="\r")
-
-    total_assets = len(asset_map)
-    wrapped_generator = progress_generator(data_generator(), total_assets)
-
-    # Step 5: Validate generator output
-    for sid, df in wrapped_generator:
-        assert isinstance(df, pd.DataFrame), f"Invalid data for SID {sid}: not a DataFrame"
-        print(f"Validated SID: {sid}, DataFrame:\n{df.head()}")
-
-    # Step 6: Write data to daily bar writer
-    daily_bar_writer.write(data_generator(), show_progress=None)
-
+    try:
+        daily_bar_writer.write(data_generator(), show_progress=show_progress)
+    except Exception as e:
+        print(f"Error during ingestion: {e}")
+        raise
 
 # Register the custom bundle
 register("custom_csv", custom_bundle)
 
 if __name__ == "__main__":
-    # Run the custom bundle ingestion
-    os.environ["ZIPLINE_ROOT"] = "data/zipline_root"
+    from zipline.data.bundles.core import ingest
+
     try:
+        print(f"ZIPLINE_ROOT: {os.getenv('ZIPLINE_ROOT', 'data/zipline_root')}")
         ingest("custom_csv")
     except Exception as e:
-        print(f"Error during ingestion: {e}")
+        print(f"Error: {e}")
