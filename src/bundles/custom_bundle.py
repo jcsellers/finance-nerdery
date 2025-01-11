@@ -3,7 +3,6 @@ import sqlite3
 import pandas as pd
 from zipline.data.bundles import register, ingest
 from zipline.utils.cli import maybe_show_progress
-from zipline.data.bundles.core import CallbackManager
 
 # Paths and configurations
 DB_PATH = os.getenv("DB_PATH", "data/output/aligned_data.db")
@@ -87,9 +86,14 @@ def custom_bundle(
         for sid, df in data.groupby("sid"):
             yield asset_map[sid], df
 
-    # Step 4: Wrap the generator for progress tracking
-    progress_callback = CallbackManager()
-    wrapped_generator = maybe_show_progress(data_generator(), show_progress=progress_callback)
+    # Step 4: Wrap the generator for manual progress tracking
+    def progress_generator(generator, total):
+        for count, item in enumerate(generator, start=1):
+            yield item
+            print(f"Progress: {count}/{total} items processed", end="\r")
+
+    total_assets = len(asset_map)
+    wrapped_generator = progress_generator(data_generator(), total_assets)
 
     # Step 5: Validate generator output
     for sid, df in wrapped_generator:
