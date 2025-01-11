@@ -70,8 +70,7 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
     # Load the CSV into a DataFrame
     data = pd.read_csv(csv_temp_path, parse_dates=["date"])
 
-    # Ensure all dates are valid and align with the calendar
-    data = data.dropna(subset=["date"])  # Drop rows with invalid dates
+    # Ensure all dates are valid and align with the trading calendar
     data["date"] = pd.to_datetime(data["date"], errors="coerce")  # Coerce invalid dates to NaT
     data = data.dropna(subset=["date"])  # Drop rows where date parsing failed
     data = data[data["date"] >= start_session]  # Filter dates outside the calendar range
@@ -85,7 +84,6 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
 
     # Keep only valid dates
     data = data[data["date"].isin(valid_sessions)]
-
     print(f"Validated data:\n{data.head()}")
 
     # Ensure column names are compatible
