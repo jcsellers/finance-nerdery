@@ -72,7 +72,23 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
 
     # Filter invalid and out-of-range dates
     data = data.dropna(subset=["date"])  # Drop rows where date parsing failed
-    data = data[(data["date"] >= start_session) & (data["date"] <= end_session)]  # Filter by date range
+
+    # Fetch the full range of dates from the database
+    db_connection = sqlite3.connect(db_path)
+    db_date_range = pd.read_sql_query(
+        "SELECT MIN(Date) AS start_date, MAX(Date) AS end_date FROM data;", db_connection
+    )
+    db_connection.close()
+    db_start_date = pd.to_datetime(db_date_range["start_date"].iloc[0])
+    db_end_date = pd.to_datetime(db_date_range["end_date"].iloc[0])
+
+    print(f"Database date range: {db_start_date} to {db_end_date}")
+
+    # Ensure dates are within the database range
+    data = data[(data["date"] >= db_start_date) & (data["date"] <= db_end_date)]
+
+    # Further restrict dates to the simulation range
+    data = data[(data["date"] >= start_session) & (data["date"] <= end_session)]
 
     # Align with valid trading calendar sessions
     valid_sessions = calendar.sessions_in_range(start_session, end_session)
@@ -104,6 +120,12 @@ def custom_bundle(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
 
     # Adjust data types
     data["sid"] = data["sid"].astype("category").cat.codes
+
+    # Final validation: Ensure no invalid dates are passed
+    invalid_rows = data[(data["date"] < db_start_date) | (data["date"] > db_end_date)]
+    if not invalid_rows.empty:
+        print(f"Invalid rows detected:\n{invalid_rows}")
+        raise ValueError("Invalid rows detected in final data.")
 
     # Group by 'sid' and write daily bar data
     def data_generator():
