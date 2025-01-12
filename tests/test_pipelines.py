@@ -52,9 +52,19 @@ def test_fred_pipeline_valid_data(mock_fred_class):
     # Fetch data using the mocked pipeline
     result = pipeline.fetch_data(["DGS10"], "2020-01-01", "2020-12-31")
 
-    # Verify the results
-    assert "DGS10" in result.columns
+    # Verify the structure of the DataFrame
+    expected_columns = {"date", "value", "ticker", "data_flag"}
+    assert (
+        set(result.columns) == expected_columns
+    ), f"Unexpected columns: {result.columns.tolist()}"
+
+    # Ensure the 'ticker' column contains 'DGS10'
+    assert result["ticker"].unique().tolist() == ["DGS10"]
+
+    # Validate row count and content
     assert len(result) == 3, f"Expected 3 rows, got {len(result)}"
+    assert result["value"].tolist() == [1.5, 2.5, 3.5]
+    assert result["data_flag"].tolist() == ["actual", "actual", "actual"]
 
 
 def test_synthetic_pipeline():

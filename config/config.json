@@ -5,7 +5,9 @@
             "SSO",
             "UPRO",
             "GLD",
-            "TLT"
+            "TLT",
+            "^SPX",
+            "^VIX"
         ],
         "FRED": [
             "BAMLH0A0HYM2",

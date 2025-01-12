@@ -1,3 +1,5 @@
+from time import sleep
+
 import pandas as pd
 from fredapi import Fred
 
@@ -26,31 +28,52 @@ class FredPipeline:
             end_date (str): End date for the data range (YYYY-MM-DD).
 
         Returns:
-            pd.DataFrame: Normalized data with columns ['Date', 'Ticker', '<ticker>', 'data_flag'].
+            pd.DataFrame: Normalized data with columns ['date', 'value', 'ticker', 'data_flag'].
         """
-        data = []
-        try:
-            for ticker in tickers:
-                # Fetch time series data for the ticker
-                series = self.fred.get_series(
-                    ticker, observation_start=start_date, observation_end=end_date
-                )
-                if series.empty:
-                    raise ValueError(f"No data returned for ticker: {ticker}")
+        all_data = []
+        for ticker in tickers:
+            for attempt in range(3):  # Retry logic with 3 attempts
+                try:
+                    logger.info(
+                        f"Fetching FRED data for ticker: {ticker}, attempt: {attempt + 1}"
+                    )
+                    series = self.fred.get_series(
+                        ticker, observation_start=start_date, observation_end=end_date
+                    )
 
-                # Normalize the data
-                df = series.reset_index()
-                df.columns = ["Date", ticker]
-                df["Ticker"] = ticker
-                df[
-                    "data_flag"
-                ] = "actual"  # Indicate that data is directly from the source
-                data.append(df)
+                    if series.empty:
+                        logger.warning(f"No data returned for ticker: {ticker}")
+                        break
 
-            # Combine all data into a single DataFrame
-            result = pd.concat(data, ignore_index=True)
-            logger.info(f"FRED data fetched successfully for {len(tickers)} tickers.")
-            return result
-        except Exception as e:
-            logger.error(f"Error fetching data for ticker {ticker}: {e}")
-            raise
+                    # Normalize the fetched series into a DataFrame
+                    df = series.reset_index()
+                    df.columns = ["date", "value"]
+                    df["ticker"] = ticker
+                    df["data_flag"] = "actual"
+
+                    all_data.append(df)
+                    logger.info(f"Data fetched successfully for ticker: {ticker}")
+                    break
+                except Exception as e:
+                    logger.error(
+                        f"Error fetching data for ticker {ticker} on attempt {attempt + 1}: {e}"
+                    )
+                    if attempt < 2:  # Retry for the first two failures
+                        sleep(2**attempt)  # Exponential backoff
+                    else:
+                        logger.error(
+                            f"Failed to fetch data for ticker: {ticker} after 3 attempts."
+                        )
+                        logger.warning(
+                            f"Skipping ticker {ticker} due to persistent issues."
+                        )
+                        break
+
+        # Combine all fetched data into a single DataFrame
+        if all_data:
+            combined_data = pd.concat(all_data, ignore_index=True)
+            logger.info(f"FRED data fetched successfully for {len(all_data)} tickers.")
+            return combined_data
+        else:
+            logger.warning("No data fetched for any tickers.")
+            return pd.DataFrame()

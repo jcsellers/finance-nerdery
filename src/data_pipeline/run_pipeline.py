@@ -1,4 +1,3 @@
-# Updated to Address Code Nazi Feedback and Examples
 import json
 import logging
 import os
@@ -7,17 +6,15 @@ from time import sleep
 
 from dotenv import load_dotenv
 
-from ..utils.sqlite_utils import save_to_sqlite
-from .fred_pipeline import FredPipeline
-from .synthetic_pipeline import SyntheticPipeline
-from .yahoo_pipeline import YahooPipeline
+from src.data_pipeline.fred_pipeline import FredPipeline
+from src.data_pipeline.synthetic_pipeline import SyntheticPipeline
+from src.data_pipeline.yahoo_pipeline import YahooPipeline
+from src.utils.row_count_validation import save_and_validate_pipeline_data
 
-# Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
 
 def exponential_backoff_retry(func, retries=3, backoff_factor=2):
-    """Retry logic with exponential backoff."""
     for attempt in range(retries):
         try:
             return func()
@@ -30,7 +27,6 @@ def exponential_backoff_retry(func, retries=3, backoff_factor=2):
 
 
 def load_config_from_env():
-    """Load configuration from environment variable or use default path."""
     config_path = os.getenv("CONFIG_PATH", "./config/config.json")
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
@@ -38,12 +34,10 @@ def load_config_from_env():
 
 
 def load_config(config_path):
-    """Load and preprocess the configuration file."""
     try:
         with open(config_path, "r") as f:
             config = json.load(f)
 
-        # Replace "current" with today's date
         today = datetime.now().strftime("%Y-%m-%d")
         if config["date_ranges"]["end_date"] == "current":
             config["date_ranges"]["end_date"] = today
@@ -55,7 +49,6 @@ def load_config(config_path):
 
 
 def ensure_output_directories(config):
-    """Ensure all output directories exist."""
     sqlite_path = config["storage"]["SQLite"]
     csv_dir = config["storage"]["CSV"]
     logging.info(f"Ensuring output directories exist: {sqlite_path}, {csv_dir}")
@@ -64,7 +57,6 @@ def ensure_output_directories(config):
 
 
 def run_yahoo_pipeline(config, csv_dir, sqlite_path):
-    """Run Yahoo Finance pipeline and save outputs."""
     try:
         yahoo_pipeline = YahooPipeline(retry_attempts=3)
         yahoo_data = exponential_backoff_retry(
@@ -74,24 +66,21 @@ def run_yahoo_pipeline(config, csv_dir, sqlite_path):
                 end_date=config["date_ranges"]["end_date"],
             )
         )
-        yahoo_data.to_csv(os.path.join(csv_dir, "yahoo_data.csv"), index=False)
-        save_to_sqlite(sqlite_path, "yahoo_data", yahoo_data)
+        csv_path = os.path.join(csv_dir, "yahoo_data.csv")
+        save_and_validate_pipeline_data(yahoo_data, sqlite_path, "yahoo_data", csv_path)
         logging.info("Yahoo Pipeline completed successfully.")
     except Exception as e:
         logging.error(f"Error in Yahoo Pipeline: {e}")
 
 
 def run_fred_pipeline(config, csv_dir, sqlite_path):
-    """Run FRED pipeline and save outputs."""
     try:
         dotenv_path = os.path.join(os.path.dirname(__file__), "../../.env")
         load_dotenv(dotenv_path)
 
         fred_api_key = os.getenv("FRED_API_KEY")
         if not fred_api_key:
-            raise ValueError(
-                "FRED_API_KEY environment variable is not set. Please configure it in your .env file or environment."
-            )
+            raise ValueError("FRED_API_KEY environment variable is not set.")
         fred_pipeline = FredPipeline(api_key=fred_api_key)
         fred_data = exponential_backoff_retry(
             lambda: fred_pipeline.fetch_data(
@@ -100,15 +89,14 @@ def run_fred_pipeline(config, csv_dir, sqlite_path):
                 end_date=config["date_ranges"]["end_date"],
             )
         )
-        fred_data.to_csv(os.path.join(csv_dir, "fred_data.csv"), index=False)
-        save_to_sqlite(sqlite_path, "fred_data", fred_data)
+        csv_path = os.path.join(csv_dir, "fred_data.csv")
+        save_and_validate_pipeline_data(fred_data, sqlite_path, "fred_data", csv_path)
         logging.info("FRED Pipeline completed successfully.")
     except Exception as e:
         logging.error(f"Error in FRED Pipeline: {e}")
 
 
 def run_synthetic_pipeline(config, csv_dir, sqlite_path):
-    """Run synthetic data pipeline and save outputs."""
     try:
         synthetic_pipeline = SyntheticPipeline()
         syn_cash = synthetic_pipeline.generate_cash(
@@ -116,8 +104,22 @@ def run_synthetic_pipeline(config, csv_dir, sqlite_path):
             end_date=config["date_ranges"]["end_date"],
             start_value=1.0,
         )
-        syn_cash.to_csv(os.path.join(csv_dir, "synthetic_cash.csv"), index=False)
-        save_to_sqlite(sqlite_path, "synthetic_cash", syn_cash)
+        syn_cash_csv_path = os.path.join(csv_dir, "synthetic_cash.csv")
+        save_and_validate_pipeline_data(
+            syn_cash, sqlite_path, "synthetic_cash", syn_cash_csv_path
+        )
+
+        syn_linear = synthetic_pipeline.generate_linear(
+            start_date=config["date_ranges"]["start_date"],
+            end_date=config["date_ranges"]["end_date"],
+            start_value=config["Synthetic Data"]["syn_linear"]["start_value"],
+            growth_rate=config["Synthetic Data"]["syn_linear"]["growth_rate"],
+        )
+        syn_linear_csv_path = os.path.join(csv_dir, "synthetic_linear.csv")
+        save_and_validate_pipeline_data(
+            syn_linear, sqlite_path, "synthetic_linear", syn_linear_csv_path
+        )
+
         logging.info("Synthetic Pipeline completed successfully.")
     except Exception as e:
         logging.error(f"Error in Synthetic Pipeline: {e}")
@@ -127,13 +129,9 @@ def main():
     logging.info("Starting the pipeline...")
 
     try:
-        # Load configuration
         config = load_config_from_env()
-
-        # Ensure output directories exist
         ensure_output_directories(config)
 
-        # Run individual pipelines
         run_yahoo_pipeline(
             config, config["storage"]["CSV"], config["storage"]["SQLite"]
         )

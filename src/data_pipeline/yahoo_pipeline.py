@@ -4,24 +4,6 @@ import pandas as pd
 import yfinance as yf
 
 from ..utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-from time import sleep
-
-import pandas as pd
-import yfinance as yf
-
-from ..utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-from time import sleep
-
-import pandas as pd
-import yfinance as yf
-
-from ..utils.logger import get_logger
 from ..utils.sqlite_utils import save_to_sqlite
 
 logger = get_logger(__name__)
@@ -71,18 +53,17 @@ class YahooPipeline:
                     if isinstance(data.columns, pd.MultiIndex):
                         data = data.stack(level=0).reset_index()
                         data.rename(columns={"Date": "date"}, inplace=True)
-                        data["ticker"] = ticker
                     elif "Open" in data.columns:
                         data.reset_index(inplace=True)
                         data.rename(columns={"Date": "date"}, inplace=True)
-                        data["ticker"] = ticker
                     else:
                         raise ValueError(
                             f"Unexpected data structure for ticker {ticker}"
                         )
 
-                    # Ensure no duplicate columns
-                    data = data.loc[:, ~data.columns.duplicated()]
+                    # Add 'ticker' column only if it doesn't exist
+                    if "ticker" not in data.columns:
+                        data["ticker"] = ticker
 
                     # Ensure all column names are lowercase
                     data.columns = [col.lower() for col in data.columns]
@@ -103,9 +84,11 @@ class YahooPipeline:
 
         if all_data:
             combined_data = pd.concat(all_data, ignore_index=True)
-            logger.info("Yahoo Finance data normalized successfully.")
 
-            # Log column names for debugging
+            # Remove duplicate columns
+            combined_data = combined_data.loc[:, ~combined_data.columns.duplicated()]
+
+            logger.info("Yahoo Finance data normalized successfully.")
             logger.info(f"Columns in combined data: {combined_data.columns.tolist()}")
             return combined_data
         else:
