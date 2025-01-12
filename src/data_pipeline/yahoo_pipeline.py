@@ -28,27 +28,25 @@ class YahooPipeline:
                 logger.error(f"No data fetched for tickers: {tickers}")
                 raise ValueError("Empty response from Yahoo Finance.")
 
-            # Stack and reset index to convert MultiIndex columns
-            data = data.stack(level=0).reset_index()
+            # Stack and reset index
+            data = data.stack(level=0, future_stack=True).reset_index()
 
             # Rename columns for clarity
             data.rename(columns={"level_1": "ticker", "Date": "date"}, inplace=True)
 
-            # Separate each field (e.g., Open, Close) into individual columns
+            # Extract fields and normalize
             fields = ["open", "high", "low", "close", "volume"]
             reshaped_data = pd.DataFrame()
             for field in fields:
                 field_data = data[data["ticker"].str.lower() == field].copy()
                 field_data.drop(columns=["ticker"], inplace=True)
-                field_data.rename(
-                    columns={tickers[0]: field}, inplace=True
-                )  # Use field names directly
+                field_data.rename(columns={tickers[0]: field}, inplace=True)
 
                 if reshaped_data.empty:
                     reshaped_data = field_data
                 else:
-                    reshaped_data = reshaped_data.merge(
-                        field_data, on="date", how="outer"
+                    reshaped_data = pd.merge(
+                        reshaped_data, field_data, on="date", how="outer"
                     )
 
             logger.info("Yahoo Finance data normalized successfully.")
