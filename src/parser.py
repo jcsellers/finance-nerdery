@@ -18,16 +18,10 @@ def parse_config(config_path):
             config = json.load(file)
         logger.info("Configuration file loaded successfully.")
 
-        # Validate tickers
+        # Validate configuration
         validate_tickers(config.get("tickers", {}))
-
-        # Validate aliases
         validate_aliases(config.get("aliases", {}))
-
-        # Validate date ranges
         validate_date_ranges(config.get("date_ranges", {}))
-
-        # Validate and create paths
         validate_paths(config.get("storage", {}))
 
         logger.info("Configuration validation completed successfully.")
