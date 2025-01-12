@@ -1,7 +1,7 @@
 import pandas as pd
 from fredapi import Fred
 
-from src.utils.logger import get_logger
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -14,13 +14,22 @@ class FredPipeline:
         data = {}
         try:
             for ticker in tickers:
+                # Fetch series data
                 series = self.fred.get_series(
                     ticker, observation_start=start_date, observation_end=end_date
                 )
-                data[ticker] = series
-            df = pd.DataFrame(data)
+                # Convert to DataFrame and reset index to include Date as a column
+                df = series.reset_index()
+                df.columns = ["Date", ticker]  # Rename columns
+                data[ticker] = df
+
+            # Merge all ticker DataFrames on the Date column
+            result = pd.concat(data.values(), axis=1, join="inner")
+            result = result.loc[
+                :, ~result.columns.duplicated()
+            ]  # Remove duplicate Date columns
             logger.info("FRED data fetched successfully.")
-            return df
+            return result
         except Exception as e:
             logger.error(f"Error fetching FRED data: {e}")
             raise
