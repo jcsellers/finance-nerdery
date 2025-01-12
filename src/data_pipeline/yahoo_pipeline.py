@@ -8,6 +8,7 @@ logger = get_logger(__name__)
 
 class YahooPipeline:
     def fetch_data(self, tickers, start_date, end_date):
+        """Fetch data from Yahoo Finance and normalize for processing."""
         try:
             # Fetch data for all tickers
             data = yf.download(
@@ -16,7 +17,6 @@ class YahooPipeline:
 
             # Normalize data
             if isinstance(data, pd.DataFrame):
-                # Transform the multi-level columns into a flat table
                 data = data.stack(level=0).reset_index()
                 data.rename(columns={"level_1": "Ticker"}, inplace=True)
                 logger.info("Yahoo Finance data normalized successfully.")

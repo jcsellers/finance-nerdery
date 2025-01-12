@@ -11,23 +11,23 @@ class FredPipeline:
         self.fred = Fred(api_key=api_key)
 
     def fetch_data(self, tickers, start_date, end_date):
-        data = {}
+        """Fetch data from FRED and normalize for processing."""
+        data = []
         try:
             for ticker in tickers:
                 # Fetch series data
                 series = self.fred.get_series(
                     ticker, observation_start=start_date, observation_end=end_date
                 )
-                # Convert to DataFrame and reset index to include Date as a column
+                # Reset index to include Date as a column
                 df = series.reset_index()
-                df.columns = ["Date", ticker]  # Rename columns
-                data[ticker] = df
+                df.columns = ["Date", "Value"]
+                df["Ticker"] = ticker  # Add Ticker column
+                df["data_flag"] = "actual"  # Default flag as "actual"
+                data.append(df)
 
-            # Merge all ticker DataFrames on the Date column
-            result = pd.concat(data.values(), axis=1, join="inner")
-            result = result.loc[
-                :, ~result.columns.duplicated()
-            ]  # Remove duplicate Date columns
+            # Combine all data into a single DataFrame
+            result = pd.concat(data, ignore_index=True)
             logger.info("FRED data fetched successfully.")
             return result
         except Exception as e:

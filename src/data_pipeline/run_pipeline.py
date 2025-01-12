@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
+from time import sleep
 
 from dotenv import load_dotenv
 
@@ -12,6 +13,19 @@ from .yahoo_pipeline import YahooPipeline
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
+
+
+def exponential_backoff_retry(func, retries=3, backoff_factor=2):
+    """Retry logic with exponential backoff."""
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            logging.warning(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < retries - 1:
+                sleep(backoff_factor**attempt)
+            else:
+                raise
 
 
 def load_config(config_path):
@@ -29,6 +43,25 @@ def load_config(config_path):
     except Exception as e:
         logging.error(f"Error loading configuration: {e}")
         raise
+
+
+def handle_missing_values(df, column_name="Value"):
+    """Handle missing values in the FRED data."""
+    df["data_flag"] = "actual"
+    if df[column_name].isnull().any():
+        # Forward-fill missing values
+        df[column_name] = df[column_name].ffill()
+
+        # Mark rows with filled values
+        df.loc[df[column_name].isnull(), "data_flag"] = "filled"
+
+    return df
+
+
+def normalize_column_names(df):
+    """Ensure all column names are lowercase for Zipline compatibility."""
+    df.columns = [col.lower() for col in df.columns]
+    return df
 
 
 def main():
@@ -56,11 +89,14 @@ def main():
     try:
         logging.info("Running Yahoo Pipeline...")
         yahoo_pipeline = YahooPipeline()
-        yahoo_data = yahoo_pipeline.fetch_data(
-            tickers=config["tickers"]["Yahoo Finance"],
-            start_date=config["date_ranges"]["start_date"],
-            end_date=config["date_ranges"]["end_date"],
+        yahoo_data = exponential_backoff_retry(
+            lambda: yahoo_pipeline.fetch_data(
+                tickers=config["tickers"]["Yahoo Finance"],
+                start_date=config["date_ranges"]["start_date"],
+                end_date=config["date_ranges"]["end_date"],
+            )
         )
+        yahoo_data = normalize_column_names(yahoo_data)
         yahoo_data.to_csv(os.path.join(csv_dir, "yahoo_data.csv"), index=False)
         save_to_sqlite(sqlite_path, "yahoo_data", yahoo_data)
         logging.info("Yahoo Pipeline completed successfully.")
@@ -74,11 +110,15 @@ def main():
         if not fred_api_key:
             raise ValueError("FRED_API_KEY environment variable is not set.")
         fred_pipeline = FredPipeline(api_key=fred_api_key)
-        fred_data = fred_pipeline.fetch_data(
-            tickers=config["tickers"]["FRED"],
-            start_date=config["date_ranges"]["start_date"],
-            end_date=config["date_ranges"]["end_date"],
+        fred_data = exponential_backoff_retry(
+            lambda: fred_pipeline.fetch_data(
+                tickers=config["tickers"]["FRED"],
+                start_date=config["date_ranges"]["start_date"],
+                end_date=config["date_ranges"]["end_date"],
+            )
         )
+        fred_data = handle_missing_values(fred_data)
+        fred_data = normalize_column_names(fred_data)
         fred_data.to_csv(os.path.join(csv_dir, "fred_data.csv"), index=False)
         save_to_sqlite(sqlite_path, "fred_data", fred_data)
         logging.info("FRED Pipeline completed successfully.")
@@ -100,6 +140,8 @@ def main():
             start_value=1.0,
             growth_rate=0.01,
         )
+        syn_cash = normalize_column_names(syn_cash)
+        syn_linear = normalize_column_names(syn_linear)
         syn_cash.to_csv(os.path.join(csv_dir, "synthetic_cash.csv"), index=False)
         syn_linear.to_csv(os.path.join(csv_dir, "synthetic_linear.csv"), index=False)
         save_to_sqlite(sqlite_path, "synthetic_cash", syn_cash)
