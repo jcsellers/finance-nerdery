@@ -1,30 +1,46 @@
 from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
 
-from ..utils.logger import get_logger
 
-logger = get_logger(__name__)
+def generate_cash(start_date, end_date, constant_value):
+    """
+    Generate synthetic cash data with a constant value.
+
+    Args:
+        start_date (str): Start date in "YYYY-MM-DD" format.
+        end_date (str): End date in "YYYY-MM-DD" format.
+        constant_value (float): The constant value for the cash data.
+
+    Returns:
+        pd.DataFrame: Synthetic cash data.
+    """
+    dates = pd.date_range(start=start_date, end=end_date)
+    data = {
+        "date": dates,
+        "value": [constant_value] * len(dates),
+    }
+    return pd.DataFrame(data)
 
 
-class SyntheticPipeline:
-    def generate_cash(self, start_date, end_date, start_value):
-        try:
-            dates = pd.date_range(start=start_date, end=end_date, freq="D")
-            data = pd.DataFrame({"Date": dates, "Value": [start_value] * len(dates)})
-            logger.info("Synthetic cash data generated successfully.")
-            return data
-        except Exception as e:
-            logger.error(f"Error generating synthetic cash data: {e}")
-            raise
+def generate_linear(start_date, end_date, start_value, slope):
+    """
+    Generate synthetic linear data.
 
-    def generate_linear(self, start_date, end_date, start_value, growth_rate):
-        try:
-            dates = pd.date_range(start=start_date, end=end_date, freq="D")
-            values = [start_value + i * growth_rate for i in range(len(dates))]
-            data = pd.DataFrame({"Date": dates, "Value": values})
-            logger.info("Synthetic linear data generated successfully.")
-            return data
-        except Exception as e:
-            logger.error(f"Error generating synthetic linear data: {e}")
-            raise
+    Args:
+        start_date (str): Start date in "YYYY-MM-DD" format.
+        end_date (str): End date in "YYYY-MM-DD" format.
+        start_value (float): Starting value of the data.
+        slope (float): Linear slope (increment per day).
+
+    Returns:
+        pd.DataFrame: Synthetic linear data.
+    """
+    dates = pd.date_range(start=start_date, end=end_date)
+    values = [start_value + slope * i for i in range(len(dates))]
+    data = {
+        "date": dates,
+        "value": values,
+    }
+    return pd.DataFrame(data)
