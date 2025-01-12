@@ -69,6 +69,7 @@ jobs:
 
       - name: Run All Tests
         env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
           pytest tests --maxfail=5 --disable-warnings
