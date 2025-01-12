@@ -15,17 +15,12 @@ def validate_tickers(tickers):
 def validate_aliases(aliases):
     seen = set()
     for source, ticker_aliases in aliases.items():
-        if isinstance(ticker_aliases, dict):
-            for ticker, alias in ticker_aliases.items():
-                if alias in seen:
-                    raise ValueError(f"Duplicate alias found: {alias}")
-                seen.add(alias)
-        elif isinstance(ticker_aliases, str):  # Handle flat dictionary structure
-            if ticker_aliases in seen:
-                raise ValueError(f"Duplicate alias found: {ticker_aliases}")
-            seen.add(ticker_aliases)
-        else:
-            raise ValueError(f"Invalid alias format for source {source}.")
+        if not isinstance(ticker_aliases, dict):
+            raise ValueError(f"Aliases for source {source} must be a dictionary.")
+        for ticker, alias in ticker_aliases.items():
+            if alias in seen:
+                raise ValueError(f"Duplicate alias found: {alias}")
+            seen.add(alias)
 
 
 def validate_date_ranges(date_ranges):

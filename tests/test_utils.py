@@ -1,7 +1,3 @@
-import sys
-
-sys.path.insert(0, "/mnt/data/finance-nerdery/src")
-
 import os
 
 import pytest
@@ -22,8 +18,10 @@ def test_validate_tickers():
 
 def test_validate_aliases():
     with pytest.raises(ValueError):
-        validate_aliases({"SPY": "alias1", "SSO": "alias1"})  # Duplicate aliases
-    validate_aliases({"SPY": "alias1", "SSO": "alias2"})
+        validate_aliases(
+            {"Yahoo Finance": {"SPY": "alias1", "SSO": "alias1"}}
+        )  # Duplicate aliases
+    validate_aliases({"Yahoo Finance": {"SPY": "alias1", "SSO": "alias2"}})
 
 
 def test_validate_date_ranges():

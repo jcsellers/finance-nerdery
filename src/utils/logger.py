@@ -1,29 +1,24 @@
 import logging
-import os
 
 
-def get_logger(name):
-    log_dir = "logs"
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, "pipeline.log")
+def get_logger(name, log_level="INFO"):
+    """
+    Get a standardized logger for the pipeline.
 
+    Args:
+        name (str): Name of the logger (usually __name__).
+        log_level (str): Logging level (DEBUG, INFO, WARNING, ERROR).
+
+    Returns:
+        logging.Logger: Configured logger instance.
+    """
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-
-    # File handler
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(logging.DEBUG)
-    file_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    file_handler.setFormatter(file_format)
-
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_format = logging.Formatter("%(message)s")
-    console_handler.setFormatter(console_format)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(getattr(logging, log_level.upper(), "INFO"))
     return logger
