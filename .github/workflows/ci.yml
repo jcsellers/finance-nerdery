@@ -39,7 +39,6 @@ jobs:
         run: |
           isort src tests scripts
 
-
   test:
     runs-on: ubuntu-latest
     steps:
@@ -59,9 +58,11 @@ jobs:
       - name: Set Environment Variables
         run: |
           echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
-          export PYTHONPATH=$(pwd)/src:$(pwd)/tests:$PYTHONPATH
+          echo "PYTHONPATH=$(pwd)/src:$(pwd)/tests" >> $GITHUB_ENV
 
       - name: Run Configuration Tests
+        env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
         run: |
           pytest tests/test_parser.py --maxfail=5 --disable-warnings
           pytest tests/test_utils.py --maxfail=5 --disable-warnings
