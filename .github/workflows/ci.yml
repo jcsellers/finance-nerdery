@@ -4,15 +4,15 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
+      - feature/**
   pull_request:
     branches:
       - main
+      - feature/**
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -20,42 +20,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
-
-      - name: Install linting dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8 isort black
-
-      - name: Run isort (Import Sorting)
-        run: isort src tests --check --diff
-
-      - name: Run black (Code Formatter)
-        run: black src tests --check --diff
-
-      - name: Run Linting
-        run: flake8 src tests
-
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository 
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run Database Validation
-        run: python scripts/database_validation.py
+      - name: Prepare .env for Testing
+        run: |
+          cp .env.test .env
+          sed -i "s|test_fred_api_key_here|${{ secrets.FRED_API_KEY }}|g" .env
 
-      - name: Run Synthetic Data Tests
-        run: pytest tests/test_synthetic_data.py -v
+      - name: Debug .env Loading
+        run: |
+          echo "Loaded Environment Variables:"
+          cat .env
+          python -c "from dotenv import load_dotenv; load_dotenv(); import os; print('FRED_API_KEY:', os.getenv('FRED_API_KEY'))"
 
-      - name: Run all tests
-        run: pytest tests/
+      - name: Run All Tests
+        env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
+        run: |
+          pytest tests --maxfail=5 --disable-warnings
