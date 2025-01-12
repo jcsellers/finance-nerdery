@@ -60,13 +60,22 @@ jobs:
           echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
           echo "PYTHONPATH=$(pwd)/src:$(pwd)/tests" >> $GITHUB_ENV
 
-      - name: Run Configuration Tests
+      - name: Debug Python Environment
+        run: |
+          echo "PYTHONPATH: $PYTHONPATH"
+          python --version
+          python -c "import sys; print(sys.path)"
+
+      - name: Debug File Structure
+        run: |
+          ls -R src
+          ls -R tests
+
+      - name: Debug Test Discovery
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
         run: |
-          pytest tests/test_parser.py --maxfail=5 --disable-warnings
-          pytest tests/test_utils.py --maxfail=5 --disable-warnings
-          pytest tests/test_pipelines.py --maxfail=5 --disable-warnings
+          pytest tests/test_pipelines.py --collect-only -o log_cli=true
 
       - name: Run All Tests
         env:
