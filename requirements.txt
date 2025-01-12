@@ -13,4 +13,5 @@ autoflake
 isort
 python-dotenv
 zipline-reloaded
+pytest-mock
 
