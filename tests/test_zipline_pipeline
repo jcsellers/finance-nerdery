@@ -1,0 +1,88 @@
+
+import pandas as pd
+import sqlite3
+from zipline_pipeline import transform_to_zipline, load_config
+
+def test_integration_with_sqlite():
+    """
+    Integration test: Connect to an in-memory SQLite database, extract data, and transform it.
+    """
+    conn = sqlite3.connect(":memory:")
+    conn.execute("""
+    CREATE TABLE complete_data (
+        date TEXT NOT NULL,
+        open REAL,
+        high REAL,
+        low REAL,
+        close REAL NOT NULL,
+        volume INTEGER DEFAULT 0,
+        dividends REAL DEFAULT 0.0,
+        split_factor REAL DEFAULT 1.0
+    );
+    """)
+    conn.executemany("""
+    INSERT INTO complete_data (date, open, high, low, close, volume, dividends, split_factor)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    """, [
+        ("2025-01-01", 100.0, 101.0, 99.0, 100.0, 1000, 0.0, 1.0),
+        ("2025-01-02", 102.0, 103.0, 101.0, 102.0, 1500, 0.0, 1.0)
+    ])
+
+    query = "SELECT * FROM complete_data;"
+    data = pd.read_sql(query, conn)
+    conn.close()
+
+    config = {"date_range": {"start": "2025-01-01", "end": "2025-12-31"}}
+    result = transform_to_zipline(data, config, sid=1)
+
+    date_range = pd.date_range(start="2025-01-01", end="2025-12-31")
+    assert all(col in result.columns for col in ["date", "open", "high", "low", "close", "volume", "sid"]), "Missing required columns in output."
+    assert len(result) > 0, "No data in result."
+    assert result["date"].isin(date_range).all(), "Dates are outside the range."
+    print("Integration test passed!")
+
+def test_edge_cases():
+    """
+    Unit tests for edge cases.
+    """
+    data_missing_cols = pd.DataFrame({
+        'date': ['2025-01-01'],
+        'close': [105]
+    })
+    config = {"date_range": {"start": "2025-01-01", "end": "2025-12-31"}}
+    try:
+        transform_to_zipline(data_missing_cols, config, sid=1)
+    except ValueError as e:
+        assert "Missing required columns" in str(e)
+
+    data_invalid_date = pd.DataFrame({
+        'date': ['invalid_date'],
+        'open': [100],
+        'high': [110],
+        'low': [90],
+        'close': [105],
+        'volume': [1000]
+    })
+    try:
+        transform_to_zipline(data_invalid_date, config, sid=1)
+    except ValueError as e:
+        assert "Error converting 'date' column to datetime" in str(e)
+
+    data_valid = pd.DataFrame({
+        'date': ['2025-01-01'],
+        'open': [100],
+        'high': [110],
+        'low': [90],
+        'close': [105],
+        'volume': [1000]
+    })
+    try:
+        transform_to_zipline(data_valid, config, sid="invalid")
+    except ValueError as e:
+        assert "SID must be an integer" in str(e)
+
+    print("Edge case tests passed!")
+
+if __name__ == "__main__":
+    test_integration_with_sqlite()
+    test_edge_cases()
