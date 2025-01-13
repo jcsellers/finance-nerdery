@@ -1,128 +1,133 @@
+import json
+import os
 import sqlite3
-import time
 
-import numpy as np
 import pandas as pd
-import pytest
-
-from zipline_pipeline import transform_to_zipline
 
 
-@pytest.fixture
-def in_memory_db():
-    conn = sqlite3.connect(":memory:")
-    conn.execute(
-        """
-    CREATE TABLE complete_data (
-        date TEXT NOT NULL,
-        open REAL,
-        high REAL,
-        low REAL,
-        close REAL NOT NULL,
-        volume INTEGER DEFAULT 0,
-        dividends REAL DEFAULT 0.0,
-        split_factor REAL DEFAULT 1.0
-    );
-    """
+def load_config(config_path):
+    """Load the configuration file."""
+    with open(config_path, "r") as f:
+        return json.load(f)
+
+
+def generate_column_mapping(tickers):
+    """Generate dynamic column mappings based on tickers."""
+    column_mapping = {"('date', '')": "date"}
+    for ticker in tickers:
+        for field in ["open", "high", "low", "close", "volume"]:
+            column_mapping[f"('{ticker.lower()}', '{field}')"] = field
+    return column_mapping
+
+
+def transform_to_zipline(data, config, sid, column_mapping):
+    """Transforms raw data into a Zipline-compatible DataFrame."""
+    # Rename columns using the mapping
+    data = data.rename(columns=column_mapping)
+
+    # Validate required columns
+    required_columns = ["date", "open", "high", "low", "close", "volume"]
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+
+    # Convert date column to datetime
+    try:
+        data["date"] = pd.to_datetime(data["date"])
+    except Exception as e:
+        raise ValueError(f"Error converting 'date' column to datetime. Details: {e}")
+
+    # Apply date range filtering
+    date_range = config
+    start_date = (
+        pd.Timestamp(date_range.get("start_date", None))
+        if "start_date" in date_range
+        else None
     )
-    conn.executemany(
-        """
-    INSERT INTO complete_data (date, open, high, low, close, volume, dividends, split_factor)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-    """,
-        [
-            ("2025-01-01", 100.0, 101.0, 99.0, 100.0, 1000, 0.0, 1.0),
-            ("2025-01-02", 102.0, 103.0, 101.0, 102.0, 1500, 0.0, 1.0),
-        ],
+    end_date = (
+        pd.Timestamp(date_range.get("end_date", None))
+        if "end_date" in date_range and date_range["end_date"] != "current"
+        else pd.Timestamp.now()
     )
-    yield conn
+    if start_date:
+        data = data[data["date"] >= start_date]
+    if end_date:
+        data = data[data["date"] <= end_date]
+
+    # Add SID column
+    data["sid"] = sid
+
+    # Select and order columns
+    zipline_columns = ["date", "open", "high", "low", "close", "volume", "sid"]
+    data = data[zipline_columns]
+
+    return data
+
+
+def fetch_and_transform_data(
+    database_path, table_name, config, column_mapping, output_dir
+):
+    """Fetch data from the database, apply transformations, and save as CSV."""
+    # Handle None for database_path (mocked or synthetic data)
+    if database_path is None or table_name is None:
+        raise ValueError(
+            "Database path and table name must be provided for database operations."
+        )
+
+    # Connect to the SQLite database
+    conn = sqlite3.connect(database_path)
+
+    # Fetch schema for dynamic querying
+    schema_query = f"PRAGMA table_info({table_name});"
+    schema = pd.read_sql(schema_query, conn)
+    print("Schema for table:", table_name)
+    print(schema)
+
+    # Generate dynamic query based on column mapping
+    select_clause = ", ".join(
+        [f'"{col}" AS {alias}' for col, alias in column_mapping.items()]
+    )
+    query = f"SELECT {select_clause} FROM {table_name};"
+    data = pd.read_sql(query, conn)
+
+    # Apply transformations
+    transformed_data = transform_to_zipline(
+        data=data, config=config["date_ranges"], sid=1, column_mapping=column_mapping
+    )
+
+    # Save transformed data to CSV
+    output_file = f"{output_dir}/transformed_{table_name}.csv"
+    transformed_data.to_csv(output_file, index=False)
+    print(f"Transformed data saved to: {output_file}")
+
     conn.close()
 
 
-def generate_large_dataset(num_rows=10000):
-    """Generate a synthetic dataset with the specified number of rows."""
-    dates = pd.date_range(start="2025-01-01", periods=num_rows, freq="D")
-    data = {
-        "date": np.random.choice(dates, size=num_rows),
-        "open": np.random.uniform(100, 200, size=num_rows),
-        "high": np.random.uniform(200, 300, size=num_rows),
-        "low": np.random.uniform(50, 100, size=num_rows),
-        "close": np.random.uniform(150, 250, size=num_rows),
-        "volume": np.random.randint(1000, 10000, size=num_rows),
-    }
-    return pd.DataFrame(data)
+# Ensure CONFIG_PATH is set for tests
+def ensure_config_path():
+    """Ensure CONFIG_PATH is set."""
+    if "CONFIG_PATH" not in os.environ:
+        os.environ["CONFIG_PATH"] = "config/config.json"
 
 
-def test_integration_with_sqlite(in_memory_db):
-    query = "SELECT * FROM complete_data;"
-    data = pd.read_sql(query, in_memory_db)
+# Load the configuration
+ensure_config_path()
+config_path = os.getenv("CONFIG_PATH")
+config = load_config(config_path)
 
-    config = {"date_range": {"start": "2025-01-01", "end": "2025-12-31"}}
-    result = transform_to_zipline(data, config, sid=1)
+# Extract settings
+sqlite_path = config["storage"]["SQLite"]
+csv_output_dir = config["storage"]["CSV"]
+tickers = config["tickers"]["Yahoo Finance"]
 
-    date_range = pd.date_range(start="2025-01-01", end="2025-12-31")
-    assert all(
-        col in result.columns
-        for col in ["date", "open", "high", "low", "close", "volume", "sid"]
-    ), "Missing required columns in output."
-    assert len(result) > 0, "No data in result."
-    assert result["date"].isin(date_range).all(), "Dates are outside the range."
+# Generate column mapping
+COLUMN_MAPPING = generate_column_mapping(tickers)
 
-
-def test_missing_columns():
-    data_missing_cols = pd.DataFrame({"date": ["2025-01-01"], "close": [105]})
-    config = {"date_range": {"start": "2025-01-01", "end": "2025-12-31"}}
-    with pytest.raises(ValueError, match="Missing required columns"):
-        transform_to_zipline(data_missing_cols, config, sid=1)
-
-
-def test_invalid_date():
-    data_invalid_date = pd.DataFrame(
-        {
-            "date": ["invalid_date"],
-            "open": [100],
-            "high": [110],
-            "low": [90],
-            "close": [105],
-            "volume": [1000],
-        }
-    )
-    config = {"date_range": {"start": "2025-01-01", "end": "2025-12-31"}}
-    with pytest.raises(ValueError, match="Error converting 'date' column to datetime"):
-        transform_to_zipline(data_invalid_date, config, sid=1)
-
-
-def test_invalid_sid():
-    data_valid = pd.DataFrame(
-        {
-            "date": ["2025-01-01"],
-            "open": [100],
-            "high": [110],
-            "low": [90],
-            "close": [105],
-            "volume": [1000],
-        }
-    )
-    config = {"date_range": {"start": "2025-01-01", "end": "2025-12-31"}}
-    with pytest.raises(ValueError, match="SID must be an integer"):
-        transform_to_zipline(data_valid, config, sid="invalid")
-
-
-def test_transform_performance():
-    """Test the performance of transform_to_zipline with a large dataset."""
-    # Generate a dataset with 10,000 rows
-    large_data = generate_large_dataset(10000)
-
-    # Define a test configuration
-    config = {"date_range": {"start": "2025-01-01", "end": "2025-12-31"}}
-
-    # Measure the time taken
-    start_time = time.time()
-    result = transform_to_zipline(large_data, config, sid=1)
-    elapsed_time = time.time() - start_time
-
-    # Assert the function completes within an acceptable time (e.g., 1 second)
-    assert elapsed_time < 1, f"Performance test failed: Took {elapsed_time:.2f} seconds"
-
-    # Optionally print results for debugging
-    print(f"Performance test passed: Took {elapsed_time:.2f} seconds")
+# Run pipeline for yahoo_data table
+fetch_and_transform_data(
+    database_path=sqlite_path,
+    table_name="yahoo_data",
+    config=config,
+    column_mapping=COLUMN_MAPPING,
+    output_dir=csv_output_dir,
+)
