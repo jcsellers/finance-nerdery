@@ -1,18 +1,40 @@
 import json
+import logging
 import os
 import sqlite3
 
 import pandas as pd
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-def load_config(config_path):
-    """Load the configuration file."""
+
+def load_config(config_path: str) -> dict:
+    """
+    Load the configuration file.
+
+    Args:
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        dict: Parsed configuration data.
+    """
     with open(config_path, "r") as f:
         return json.load(f)
 
 
-def generate_column_mapping(tickers):
-    """Generate dynamic column mappings based on tickers."""
+def generate_column_mapping(tickers: list) -> dict:
+    """
+    Generate dynamic column mappings based on tickers.
+
+    Args:
+        tickers (list): List of tickers to generate mappings for.
+
+    Returns:
+        dict: Mapping from unconventional column names to standardized names.
+    """
     column_mapping = {"('date', '')": "date"}
     for ticker in tickers:
         for field in ["open", "high", "low", "close", "volume"]:
@@ -20,8 +42,21 @@ def generate_column_mapping(tickers):
     return column_mapping
 
 
-def transform_to_zipline(data, config, sid, column_mapping):
-    """Transforms raw data into a Zipline-compatible DataFrame."""
+def transform_to_zipline(
+    data: pd.DataFrame, config: dict, sid: int, column_mapping: dict
+) -> pd.DataFrame:
+    """
+    Transforms raw financial data into a Zipline-compatible DataFrame.
+
+    Args:
+        data (pd.DataFrame): Raw financial data with columns to be renamed.
+        config (dict): Configuration dictionary containing 'start_date' and 'end_date'.
+        sid (int): Security identifier for the dataset.
+        column_mapping (dict): Mapping from raw column names to standard column names.
+
+    Returns:
+        pd.DataFrame: Transformed data with columns ['date', 'open', 'high', 'low', 'close', 'volume', 'sid'].
+    """
     # Rename columns using the mapping
     data = data.rename(columns=column_mapping)
 
@@ -54,6 +89,9 @@ def transform_to_zipline(data, config, sid, column_mapping):
     if end_date:
         data = data[data["date"] <= end_date]
 
+    if data.empty:
+        logging.warning("No data matched the specified date range.")
+
     # Add SID column
     data["sid"] = sid
 
@@ -61,15 +99,35 @@ def transform_to_zipline(data, config, sid, column_mapping):
     zipline_columns = ["date", "open", "high", "low", "close", "volume", "sid"]
     data = data[zipline_columns]
 
+    logging.info("Transformation to Zipline-compatible format complete.")
     return data
 
 
 def fetch_and_transform_data(
-    database_path, table_name, config, column_mapping, output_dir, synthetic_data=None
-):
-    """Fetch data from the database or use synthetic data, apply transformations, and save as CSV."""
+    database_path: str,
+    table_name: str,
+    config: dict,
+    column_mapping: dict,
+    output_dir: str,
+    synthetic_data: pd.DataFrame = None,
+) -> pd.DataFrame:
+    """
+    Fetch data from the database or use synthetic data, apply transformations, and save as CSV.
+
+    Args:
+        database_path (str): Path to the SQLite database file.
+        table_name (str): Name of the table to query.
+        config (dict): Configuration dictionary containing date ranges and other settings.
+        column_mapping (dict): Mapping from raw column names to standard column names.
+        output_dir (str): Directory to save the output CSV file.
+        synthetic_data (pd.DataFrame, optional): Synthetic data to be transformed instead of fetching from the database.
+
+    Returns:
+        pd.DataFrame: Transformed data.
+    """
     if synthetic_data is not None:
         # Handle synthetic data
+        logging.info("Processing synthetic data.")
         transformed_data = transform_to_zipline(
             data=synthetic_data,
             config=config["date_ranges"],
@@ -79,7 +137,7 @@ def fetch_and_transform_data(
         if output_dir:
             output_file = f"{output_dir}/transformed_synthetic_data.csv"
             transformed_data.to_csv(output_file, index=False)
-            print(f"Transformed synthetic data saved to: {output_file}")
+            logging.info(f"Transformed synthetic data saved to: {output_file}")
         return transformed_data
 
     # Ensure database_path and table_name are provided for database operations
@@ -89,13 +147,13 @@ def fetch_and_transform_data(
         )
 
     # Connect to the SQLite database
+    logging.info(f"Connecting to database at {database_path}.")
     conn = sqlite3.connect(database_path)
 
     # Fetch schema for dynamic querying
     schema_query = f"PRAGMA table_info({table_name});"
     schema = pd.read_sql(schema_query, conn)
-    print("Schema for table:", table_name)
-    print(schema)
+    logging.info(f"Schema for table {table_name}:\n{schema}")
 
     # Generate dynamic query based on column mapping
     select_clause = ", ".join(
@@ -103,6 +161,7 @@ def fetch_and_transform_data(
     )
     query = f"SELECT {select_clause} FROM {table_name};"
     data = pd.read_sql(query, conn)
+    logging.info("Data fetched successfully from the database.")
 
     # Apply transformations
     transformed_data = transform_to_zipline(
@@ -112,20 +171,22 @@ def fetch_and_transform_data(
     # Save transformed data to CSV
     output_file = f"{output_dir}/transformed_{table_name}.csv"
     transformed_data.to_csv(output_file, index=False)
-    print(f"Transformed data saved to: {output_file}")
+    logging.info(f"Transformed data saved to: {output_file}")
 
     conn.close()
     return transformed_data
 
 
-# Ensure CONFIG_PATH is set for tests
-def ensure_config_path():
-    """Ensure CONFIG_PATH is set."""
+def ensure_config_path() -> None:
+    """
+    Ensure CONFIG_PATH is set.
+
+    If CONFIG_PATH is not already set as an environment variable, it defaults to 'config/config.json'.
+    """
     if "CONFIG_PATH" not in os.environ:
         os.environ["CONFIG_PATH"] = "config/config.json"
 
 
-# Main execution block
 if __name__ == "__main__":
     ensure_config_path()
     config_path = os.getenv("CONFIG_PATH")
