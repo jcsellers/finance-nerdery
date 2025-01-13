@@ -35,7 +35,7 @@ def transform_to_zipline(
 
     Args:
         data (pd.DataFrame): Raw financial data with columns ['date', 'open', 'high', 'low', 'close', 'volume', 'dividends', 'split_factor'].
-        config (dict): Configuration with keys 'date_range' (list of [start_date, end_date]).
+        config (dict): Configuration with keys 'date_range' (dict or list with start and end dates).
         sid (int): Security identifier (unique integer for each symbol).
         source_type (str): The data source type (default: "default").
 
@@ -63,12 +63,18 @@ def transform_to_zipline(
     except Exception as e:
         raise ValueError(f"Error converting 'date' column to datetime. Details: {e}")
 
-    start_date, end_date = config.get("date_range", [None, None])
+    # Updated date range handling
+    date_range = config.get("date_range", {})
+    start_date = (
+        pd.Timestamp(date_range.get("start", None)) if "start" in date_range else None
+    )
+    end_date = (
+        pd.Timestamp(date_range.get("end", None)) if "end" in date_range else None
+    )
+
     if start_date:
-        start_date = pd.Timestamp(start_date)
         data = data[data["date"] >= start_date]
     if end_date:
-        end_date = pd.Timestamp(end_date)
         data = data[data["date"] <= end_date]
 
     data = data.rename(
