@@ -3,8 +3,8 @@ import os
 from importlib import import_module
 
 import pandas as pd
-from zipline.api import run_algorithm
 from zipline.data.bundles import ingest, load
+from zipline.utils.run_algo import run_algorithm
 
 
 def orchestrate(config_path):
@@ -25,7 +25,11 @@ def orchestrate(config_path):
 
     # Dynamically load strategy
     strategy_name = config["strategy"]["name"]
-    strategy_module = import_module(f"strategies.{strategy_name}")
+    strategy_module = import_module(f"src.strategies.{strategy_name}")
+
+    # Get output directory
+    output_dir = config["storage"]["output_dir"]
+    os.makedirs(output_dir, exist_ok=True)
 
     # Run backtest
     backtest_results = run_algorithm(
@@ -36,4 +40,10 @@ def orchestrate(config_path):
         analyze=strategy_module.analyze,
         bundle=bundle_name,
     )
+
+    # Save results to output_dir
+    output_file = os.path.join(output_dir, "backtest_results.csv")
+    backtest_results.to_csv(output_file, index=False)
+    print(f"Backtest results saved to {output_file}")
+
     return backtest_results
