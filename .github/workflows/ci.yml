@@ -54,8 +54,8 @@ jobs:
         run: |
           echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
           echo "PYTHONPATH=$(pwd)/src:$(pwd)/tests" >> $GITHUB_ENV
-          echo  "CONFIG_PATH: "../config/config.json">> $GITHUB_ENV
-          echo  "DB_PATH: "../data/finance_data.db">> $GITHUB_ENV
+          echo  "CONFIG_PATH: ../config/config.json">> $GITHUB_ENV
+          echo  "DB_PATH: ../data/finance_data.db">> $GITHUB_ENV
 
       - name: Run Configuration Tests
         env:
