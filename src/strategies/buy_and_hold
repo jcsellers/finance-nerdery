@@ -1,0 +1,27 @@
+from zipline.api import order, symbol, record
+from analysis_utils import analyze_results
+
+
+def initialize(context):
+    """
+    Initialize the strategy with the desired asset and settings.
+    """
+    context.asset = symbol('SPY')  # Replace with your desired symbol
+    context.has_ordered = False  # Ensure we only buy once
+
+
+def handle_data(context, data):
+    """
+    Handle market data during each trading bar.
+    """
+    if not context.has_ordered:
+        order(context.asset, 100)  # Buy 100 shares
+        context.has_ordered = True
+    record(price=data.current(context.asset, 'price'))
+
+
+def analyze(context, perf):
+    """
+    Analyze the results after the backtest completes.
+    """
+    analyze_results(perf)
