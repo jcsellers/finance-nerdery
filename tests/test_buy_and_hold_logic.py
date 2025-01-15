@@ -4,8 +4,8 @@ import os
 from src.backtest_orchestrator import orchestrate
 
 
-def test_output_file_creation(tmp_path):
-    """Test if output files are created correctly."""
+def test_buy_and_hold_logic(tmp_path):
+    """Test the Buy-and-Hold strategy logic."""
     base_config = {
         "bundle": "custom_bundle",
         "start_date": "2025-01-01",
@@ -30,6 +30,6 @@ def test_output_file_creation(tmp_path):
         strategy_config_path=str(strategy_config_path),
     )
 
-    # Assert files are created
+    # Assert that output files are created
     assert (tmp_path / "output" / "performance_metrics.csv").exists()
     assert (tmp_path / "output" / "performance_dashboard.html").exists()

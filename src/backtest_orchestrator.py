@@ -1,49 +1,48 @@
 import json
 import os
-from importlib import import_module
 
 import pandas as pd
-from zipline.data.bundles import ingest, load
-from zipline.utils.run_algo import run_algorithm
+import vectorbt as vbt
+
+from src.utils.config_loader import load_config
 
 
-def orchestrate(config_path):
+def orchestrate(
+    base_config_path="config/base_config.json",
+    strategy_config_path="config/strategies/buy_and_hold.json",
+):
     """
-    Orchestrate the end-to-end backtesting workflow.
+    Orchestrate the backtesting process for a given strategy using vectorbt.
     """
-    # Load configuration
-    with open(config_path, "r") as f:
-        config = json.load(f)
-
-    # Ensure the custom bundle is ingested
-    bundle_name = config["bundle"]
-    try:
-        load(bundle_name)
-    except KeyError:
-        print(f"Bundle {bundle_name} not found. Ingesting...")
-        ingest(bundle_name)
-
-    # Dynamically load strategy
-    strategy_name = config["strategy"]["name"]
-    strategy_module = import_module(f"src.strategies.{strategy_name}")
-
-    # Get output directory
-    output_dir = config["storage"]["output_dir"]
+    # Load configurations
+    config = load_config(base_config_path, strategy_config_path)
+    output_dir = config.get("output_dir", "results")
     os.makedirs(output_dir, exist_ok=True)
 
-    # Run backtest
-    backtest_results = run_algorithm(
-        start=pd.Timestamp(config["start_date"], tz="utc"),
-        end=pd.Timestamp(config["end_date"], tz="utc"),
-        initialize=strategy_module.initialize,
-        handle_data=strategy_module.handle_data,
-        analyze=strategy_module.analyze,
-        bundle=bundle_name,
+    # Simulated price data
+    price_data = pd.Series(
+        [100, 101, 99, 102], index=pd.date_range(start="2025-01-01", periods=4)
+    )
+    initial_cash = 10000
+
+    # Portfolio simulation using vectorbt
+    portfolio = vbt.Portfolio.from_orders(
+        close=price_data, size=[0, 10, 0, -10], init_cash=initial_cash
     )
 
-    # Save results to output_dir
-    output_file = os.path.join(output_dir, "backtest_results.csv")
-    backtest_results.to_csv(output_file, index=False)
-    print(f"Backtest results saved to {output_file}")
+    # Generate performance metrics
+    sharpe = portfolio.sharpe_ratio()
+    max_drawdown = portfolio.max_drawdown()
 
-    return backtest_results
+    # Save metrics
+    metrics = pd.DataFrame(
+        {"Metric": ["Sharpe Ratio", "Max Drawdown"], "Value": [sharpe, max_drawdown]}
+    )
+    metrics.to_csv(os.path.join(output_dir, "performance_metrics.csv"), index=False)
+
+    # Save interactive dashboard
+    dashboard_path = os.path.join(output_dir, "performance_dashboard.html")
+    portfolio.plot().write_html(dashboard_path)
+
+    print(f"Performance metrics saved to: {output_dir}/performance_metrics.csv")
+    print(f"Dashboard saved to: {dashboard_path}")

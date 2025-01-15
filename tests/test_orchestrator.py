@@ -4,8 +4,8 @@ import os
 from src.backtest_orchestrator import orchestrate
 
 
-def test_output_file_creation(tmp_path):
-    """Test if output files are created correctly."""
+def test_orchestrator_output(tmp_path):
+    """Test that the orchestrator runs without errors and creates output files."""
     base_config = {
         "bundle": "custom_bundle",
         "start_date": "2025-01-01",

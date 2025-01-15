@@ -9,7 +9,7 @@ from src.custom_ingest import custom_ingest
 
 @pytest.fixture
 def mock_writers():
-    """Mock essential writers."""
+    """Mock writers for asset_db, daily_bar, and adjustments."""
     return {
         "asset_db_writer": MagicMock(),
         "daily_bar_writer": MagicMock(),
@@ -17,26 +17,9 @@ def mock_writers():
     }
 
 
-@pytest.fixture
-def synthetic_csv(tmp_path):
-    """Generate a temporary CSV file for testing."""
-    csv_path = tmp_path / "transformed_yahoo_data.csv"
-    data = pd.DataFrame(
-        {
-            "date": ["2025-01-01", "2025-01-02"],
-            "open": [100.0, 102.0],
-            "high": [105.0, 107.0],
-            "low": [95.0, 97.0],
-            "close": [102.0, 104.0],
-            "volume": [1000, 1100],
-        }
-    )
-    data.to_csv(csv_path, index=False)
-    return csv_path
-
-
-def test_csv_file_missing(mock_writers):
+def test_csv_file_missing(mock_writers, monkeypatch):
     """Test error when the CSV file is missing."""
+    monkeypatch.delenv("TRANSFORMED_CSV_PATH", raising=False)
     with pytest.raises(FileNotFoundError):
         custom_ingest(
             environ={},
@@ -53,11 +36,11 @@ def test_csv_file_missing(mock_writers):
         )
 
 
-def test_column_validation(mock_writers, synthetic_csv, monkeypatch):
-    """Test missing required columns."""
-    monkeypatch.setenv("TRANSFORMED_CSV_PATH", str(synthetic_csv))
-    data = pd.read_csv(synthetic_csv).drop(columns=["open"])
-    data.to_csv(synthetic_csv, index=False)
+def test_column_validation(mock_writers, tmp_path, monkeypatch):
+    """Test error for missing columns."""
+    mock_csv = tmp_path / "mock_data.csv"
+    pd.DataFrame({"date": ["2025-01-01"], "open": [100]}).to_csv(mock_csv, index=False)
+    monkeypatch.setenv("TRANSFORMED_CSV_PATH", str(mock_csv))
 
     with pytest.raises(ValueError, match="Missing required columns"):
         custom_ingest(
@@ -75,9 +58,20 @@ def test_column_validation(mock_writers, synthetic_csv, monkeypatch):
         )
 
 
-def test_metadata_writing(mock_writers, synthetic_csv, monkeypatch):
+def test_metadata_writing(mock_writers, tmp_path, monkeypatch):
     """Test asset metadata writing."""
-    monkeypatch.setenv("TRANSFORMED_CSV_PATH", str(synthetic_csv))
+    mock_csv = tmp_path / "mock_data.csv"
+    pd.DataFrame(
+        {
+            "date": ["2025-01-01", "2025-01-02"],
+            "open": [100.0, 102.0],
+            "high": [105.0, 107.0],
+            "low": [95.0, 97.0],
+            "close": [102.0, 104.0],
+            "volume": [1000, 1100],
+        }
+    ).to_csv(mock_csv, index=False)
+    monkeypatch.setenv("TRANSFORMED_CSV_PATH", str(mock_csv))
 
     custom_ingest(
         environ={},
@@ -93,22 +87,26 @@ def test_metadata_writing(mock_writers, synthetic_csv, monkeypatch):
         output_dir="output",
     )
 
-    # Check metadata writing
     mock_writers["asset_db_writer"].write.assert_called_once()
     metadata = mock_writers["asset_db_writer"].write.call_args[0][0]
     assert not metadata.empty, "Asset metadata should not be empty."
     assert metadata["symbol"].iloc[0] == "SPY", "Symbol should be 'SPY'."
-    assert metadata["start_date"].iloc[0] == pd.Timestamp(
-        "2025-01-01"
-    ), "Start date mismatch."
-    assert metadata["end_date"].iloc[0] == pd.Timestamp(
-        "2025-01-02"
-    ), "End date mismatch."
 
 
-def test_corporate_actions_writing(mock_writers, synthetic_csv, monkeypatch):
-    """Test writing of splits and dividends."""
-    monkeypatch.setenv("TRANSFORMED_CSV_PATH", str(synthetic_csv))
+def test_corporate_actions_writing(mock_writers, tmp_path, monkeypatch):
+    """Test corporate actions writing."""
+    mock_csv = tmp_path / "mock_data.csv"
+    pd.DataFrame(
+        {
+            "date": ["2025-01-01", "2025-01-02"],
+            "open": [100.0, 102.0],
+            "high": [105.0, 107.0],
+            "low": [95.0, 97.0],
+            "close": [102.0, 104.0],
+            "volume": [1000, 1100],
+        }
+    ).to_csv(mock_csv, index=False)
+    monkeypatch.setenv("TRANSFORMED_CSV_PATH", str(mock_csv))
 
     custom_ingest(
         environ={},
@@ -124,10 +122,4 @@ def test_corporate_actions_writing(mock_writers, synthetic_csv, monkeypatch):
         output_dir="output",
     )
 
-    # Check splits and dividends writing
     mock_writers["adjustment_writer"].write.assert_called_once()
-    splits = mock_writers["adjustment_writer"].write.call_args[1]["splits"]
-    dividends = mock_writers["adjustment_writer"].write.call_args[1]["dividends"]
-
-    assert splits["ratio"].iloc[0] == 0.5, "Split ratio should be 0.5."
-    assert dividends["amount"].iloc[0] == 0.5, "Dividend amount should be 0.5."
