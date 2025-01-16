@@ -3,7 +3,7 @@ import sqlite3
 
 import pandas as pd
 
-from ..utils.logger import get_logger
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
