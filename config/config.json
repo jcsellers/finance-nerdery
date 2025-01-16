@@ -45,5 +45,12 @@
             "start_value": 1.0,
             "growth_rate": 0.01
         }
-    }
+    },
+    "bundle": "custom_bundle",
+    "start_date": "2020-01-01",
+    "end_date": "2022-12-31",
+    "strategy": {
+        "name": "buy_and_hold"
+    },
+    "capital_base": 100000
 }
