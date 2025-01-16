@@ -15,4 +15,4 @@ python-dotenv
 zipline-reloaded
 pytest-mock
 quantstats
-
+vectorbt
