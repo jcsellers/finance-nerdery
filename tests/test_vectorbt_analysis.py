@@ -1,16 +1,16 @@
 import json
-import os
 
 from src.backtest_orchestrator import orchestrate
 
 
 def test_vectorbt_analysis(tmp_path):
     """Test vectorbt integration and validate the dashboard creation."""
+    output_dir = tmp_path / "output" / "reports"
     base_config = {
         "bundle": "custom_bundle",
         "start_date": "2025-01-01",
         "end_date": "2025-12-31",
-        "output_dir": str(tmp_path / "output"),
+        "output_dir": str(output_dir),
     }
     strategy_config = {
         "strategy_name": "buy_and_hold",
@@ -20,6 +20,7 @@ def test_vectorbt_analysis(tmp_path):
     base_config_path = tmp_path / "base_config.json"
     strategy_config_path = tmp_path / "buy_and_hold.json"
 
+    # Save configurations directly as JSON
     with open(base_config_path, "w") as base_file:
         json.dump(base_config, base_file)
     with open(strategy_config_path, "w") as strategy_file:
@@ -30,6 +31,8 @@ def test_vectorbt_analysis(tmp_path):
         strategy_config_path=str(strategy_config_path),
     )
 
-    # Assert that output files are created
-    assert (tmp_path / "output" / "performance_metrics.csv").exists()
-    assert (tmp_path / "output" / "performance_dashboard.html").exists()
+    # Assert files are created in the dynamically assigned temp directory
+    assert (output_dir / "performance_metrics.csv").exists(), "Metrics CSV not found"
+    assert (
+        output_dir / "performance_dashboard.html"
+    ).exists(), "Dashboard HTML not found"

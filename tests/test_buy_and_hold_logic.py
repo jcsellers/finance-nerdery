@@ -1,16 +1,16 @@
 import json
-import os
 
 from src.backtest_orchestrator import orchestrate
 
 
 def test_buy_and_hold_logic(tmp_path):
     """Test the Buy-and-Hold strategy logic."""
+    output_dir = tmp_path / "output" / "reports"
     base_config = {
         "bundle": "custom_bundle",
         "start_date": "2025-01-01",
         "end_date": "2025-12-31",
-        "output_dir": str(tmp_path / "output"),
+        "output_dir": str(output_dir),
     }
     strategy_config = {
         "strategy_name": "buy_and_hold",
@@ -30,6 +30,6 @@ def test_buy_and_hold_logic(tmp_path):
         strategy_config_path=str(strategy_config_path),
     )
 
-    # Assert that output files are created
-    assert (tmp_path / "output" / "performance_metrics.csv").exists()
-    assert (tmp_path / "output" / "performance_dashboard.html").exists()
+    # Assert files are created in the dynamically assigned temp directory
+    assert (output_dir / "performance_metrics.csv").exists()
+    assert (output_dir / "performance_dashboard.html").exists()
