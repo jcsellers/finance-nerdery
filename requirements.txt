@@ -12,7 +12,7 @@ black
 autoflake
 isort
 python-dotenv
-zipline-reloaded
 pytest-mock
 quantstats
 vectorbt
+alpha-vantage

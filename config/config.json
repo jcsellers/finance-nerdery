@@ -1,19 +1,8 @@
 {
     "tickers": {
-        "Nasdaq": [
-            "SPY",
-            "SSO",
-            "UPRO",
-            "GLD",
-            "TLT",
-            "SPX"
-        ],
-        "FRED": [
-            "BAMLH0A0HYM2",
-            "DGS10",
-            "VIXCLS"
-        ]
-    },
+        "Alpha Vantage": ["UPRO", "SSO", "SPY", "GLD", "TLT"],
+        "FRED": ["DGS10", "VIXCLS"]
+      },
     "aliases": {
         "FRED": {
         "BAMLH0A0HYM2": "OAS Spread",
@@ -22,7 +11,7 @@
     }
     },
     "date_ranges": {
-        "start_date": "2020-01-01",
+        "start_date": "2020-01-02",
         "end_date": "current"
     },
     "storage": {
