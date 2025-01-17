@@ -54,7 +54,7 @@ jobs:
 
       - name: Initialize Database Schema
         run: |
-           src/python setup_database.py
+           python /src/python setup_database.py
 
       - name: Set Environment Variables
         run: |
