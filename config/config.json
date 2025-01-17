@@ -1,24 +1,25 @@
 {
     "tickers": {
-        "Yahoo Finance": [
+        "Nasdaq": [
             "SPY",
             "SSO",
             "UPRO",
             "GLD",
             "TLT",
-            "^SPX",
-            "^VIX"
+            "SPX"
         ],
         "FRED": [
             "BAMLH0A0HYM2",
-            "DGS10"
+            "DGS10",
+            "VIXCLS"
         ]
     },
     "aliases": {
         "FRED": {
-            "BAMLH0A0HYM2": "OAS Spread",
-            "DGS10": "10 Year Treasury Yield"
-        }
+        "BAMLH0A0HYM2": "OAS Spread",
+        "DGS10": "10 Year Treasury Yield",
+        "VIXCLS": "CBOE Volatility Index"
+    }
     },
     "date_ranges": {
         "start_date": "2020-01-01",
@@ -36,6 +37,9 @@
     },
     "FRED": {
         "api_key": "your_fred_api_key"
+    },
+    "Nasdaq": {
+        "api_key_env_var": "NASDAQ_API_KEY"
     },
     "Synthetic Data": {
         "syn_cash": {

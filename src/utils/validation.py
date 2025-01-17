@@ -1,54 +1,63 @@
-import os
-from datetime import datetime
+import logging
 
-from src.utils.logger import get_logger
+import pandas as pd
 
+from utils.logger import get_logger
+
+# Initialize logger
 logger = get_logger(__name__)
 
 
-def validate_tickers(tickers):
-    if not tickers or not isinstance(tickers, dict):
-        logger.error("Invalid tickers configuration: must be a non-empty dictionary.")
-        raise ValueError("Tickers must be a non-empty dictionary.")
+def validate_date_ranges(data, start_date, end_date):
+    """
+    Validate that the data's date range matches the expected range.
+
+    Args:
+        data (pd.DataFrame): DataFrame containing the data to validate.
+        start_date (datetime): Expected start date.
+        end_date (datetime): Expected end date.
+
+    Returns:
+        pd.DataFrame: The validated DataFrame.
+    """
+    logger.info("Validating date ranges.")
+
+    # Ensure date column exists and is in datetime format
+    if "date" not in data.columns:
+        raise ValueError("The provided data does not contain a 'date' column.")
+
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    data.dropna(subset=["date"], inplace=True)
+
+    if data["date"].min() < start_date or data["date"].max() > end_date:
+        logger.warning(
+            f"Date range validation failed: Data contains dates outside {start_date} to {end_date}."
+        )
+        # Optionally filter to only valid ranges
+        data = data[(data["date"] >= start_date) & (data["date"] <= end_date)]
+
+    logger.info("Date range validation passed.")
+    return data
 
 
-def validate_aliases(aliases):
-    seen = set()
-    for source, ticker_aliases in aliases.items():
-        if not isinstance(ticker_aliases, dict):
-            raise ValueError(f"Aliases for source {source} must be a dictionary.")
-        for ticker, alias in ticker_aliases.items():
-            if alias in seen:
-                raise ValueError(f"Duplicate alias found: {alias}")
-            seen.add(alias)
+def validate_row_counts(data, expected_count):
+    """
+    Validate that the number of rows in the data matches the expected count.
 
+    Args:
+        data (pd.DataFrame): DataFrame containing the data to validate.
+        expected_count (int): Expected number of rows.
 
-def validate_date_ranges(date_ranges):
-    start_date = date_ranges.get("start_date")
-    end_date = date_ranges.get("end_date")
-    try:
-        if start_date:
-            datetime.strptime(start_date, "%Y-%m-%d")
-        if end_date and end_date != "current":
-            datetime.strptime(end_date, "%Y-%m-%d")
-        if (
-            start_date
-            and end_date
-            and start_date != "current"
-            and end_date != "current"
-        ):
-            if datetime.strptime(start_date, "%Y-%m-%d") > datetime.strptime(
-                end_date, "%Y-%m-%d"
-            ):
-                logger.error("Invalid date range: start_date cannot be after end_date.")
-                raise ValueError("start_date cannot be after end_date.")
-    except ValueError as e:
-        logger.error(f"Invalid date format: {e}")
-        raise
+    Returns:
+        bool: True if the row count matches; False otherwise.
+    """
+    actual_count = len(data)
+    if actual_count != expected_count:
+        logger.warning(
+            f"Row count validation failed: Expected {expected_count} rows, "
+            f"but got {actual_count} rows."
+        )
+        return False
 
-
-def validate_paths(storage):
-    for path_name, path_value in storage.items():
-        if not os.path.exists(path_value):
-            logger.warning(f"Path {path_value} does not exist. Creating it.")
-            os.makedirs(path_value, exist_ok=True)
+    logger.info("Row count validation passed.")
+    return True

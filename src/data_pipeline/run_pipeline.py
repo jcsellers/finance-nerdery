@@ -1,126 +1,71 @@
-import json
 import logging
 import os
-from datetime import datetime
 
-from dotenv import load_dotenv
+import pandas as pd
 from fred_pipeline import FredPipeline
+from nasdaq_pipeline import NasdaqPipeline
 from synthetic_pipeline import SyntheticPipeline
-from yahoo_pipeline import YahooPipeline
 
-# Load environment variables from .env file
-load_dotenv()
+from utils.sqlite_utils import save_to_db
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("main_pipeline")
 
 
-def run_yahoo_pipeline(start_date, end_date):
+def run_pipeline(config_path):
     """
-    Run the Yahoo data pipeline to fetch and store data.
+    Main function to run the data pipeline.
 
     Args:
-        start_date (str): Start date for data fetching (YYYY-MM-DD).
-        end_date (str): End date for data fetching (YYYY-MM-DD).
+        config_path (str): Path to the configuration file.
     """
-    yahoo_pipeline = YahooPipeline()
-    tickers = config["tickers"]["Yahoo Finance"]
     try:
-        logger.info(f"Fetching Yahoo Finance data for {start_date} to {end_date}")
-        data = yahoo_pipeline.fetch_data(tickers, start_date, end_date)
-        yahoo_pipeline.save_data(config["storage"]["SQLite"], "yahoo_data", data)
+        # Load configuration
+        config = pd.read_json(config_path)
+        logger.debug(f"Loaded configuration: {config}")
 
-        # Save data to CSV
-        data.to_csv(f"{config['storage']['CSV']}/yahoo_data.csv", index=False)
-        logger.info(
-            f"Yahoo data saved to CSV at '{config['storage']['CSV']}/yahoo_data.csv'."
-        )
+        start_date = config["date_ranges"]["start_date"]
+        end_date = config["date_ranges"]["end_date"]
+        tickers = config["tickers"].get("Nasdaq", [])
 
-        logger.info("Yahoo Pipeline completed successfully.")
+        if not tickers:
+            raise KeyError("No tickers found under 'Nasdaq' in configuration.")
+
+        # Fetch Nasdaq API Key from environment variables
+        nasdaq_api_key = os.getenv("NASDAQ_API_KEY")
+        if not nasdaq_api_key:
+            raise EnvironmentError("NASDAQ_API_KEY environment variable not set.")
+
+        logger.info("Starting Nasdaq pipeline.")
+        nasdaq_pipeline = NasdaqPipeline(start_date, end_date, tickers, nasdaq_api_key)
+        nasdaq_data = nasdaq_pipeline.run()
+
+        if not nasdaq_data.empty:
+            save_to_db(nasdaq_data, "nasdaq_data", config["storage"]["SQLite"])
+
+        # FRED Pipeline
+        logger.info("Starting FRED pipeline.")
+        fred_tickers = config["tickers"]["FRED"]
+        fred_pipeline = FredPipeline(start_date, end_date, fred_tickers)
+        fred_data = fred_pipeline.run()
+
+        if not fred_data.empty:
+            save_to_db(fred_data, "fred_data", config["storage"]["SQLite"])
+
+        # Synthetic Pipeline
+        logger.info("Starting Synthetic pipeline.")
+        synthetic_pipeline = SyntheticPipeline(start_date, end_date)
+        synthetic_data = synthetic_pipeline.run()
+
+        if not synthetic_data.empty:
+            save_to_db(synthetic_data, "synthetic_data", config["storage"]["SQLite"])
+
+        logger.info("Pipeline execution completed successfully.")
+
     except Exception as e:
-        logger.error(f"Error in Yahoo Pipeline: {e}")
-
-
-def run_fred_pipeline(start_date, end_date):
-    """
-    Run the FRED data pipeline.
-    """
-    api_key = os.getenv("FRED_API_KEY", config["FRED"]["api_key"])
-    if not api_key:
-        raise ValueError(
-            "FRED_API_KEY is not set in the environment variables or config."
-        )
-
-    series_ids = config["tickers"]["FRED"]
-    aliases = config["aliases"]["FRED"]
-
-    fred_pipeline = FredPipeline(api_key=api_key)
-    try:
-        logger.info("Running FRED pipeline.")
-        fred_pipeline.run(
-            series_ids=series_ids,
-            aliases=aliases,
-            start_date=start_date,
-            end_date=end_date,
-            output_dir=config["storage"]["CSV"],
-            db_path=config["storage"]["SQLite"],  # Pass db_path here
-        )
-        logger.info("FRED Pipeline completed successfully.")
-    except Exception as e:
-        logger.error(f"Error in FRED Pipeline: {e}")
-
-
-def run_synthetic_pipeline(start_date, end_date):
-    """
-    Run the synthetic data pipeline.
-    """
-    cash_settings = config["Synthetic Data"]["syn_cash"]
-    linear_settings = config["Synthetic Data"]["syn_linear"]
-    synthetic_pipeline = SyntheticPipeline(
-        start_date=start_date,
-        end_date=end_date,
-        cash_settings=cash_settings,
-        linear_settings=linear_settings,
-    )
-    try:
-        logger.info("Running Synthetic pipeline.")
-        synthetic_pipeline.save_data(config["storage"]["CSV"])
-        synthetic_pipeline.save_to_database(config["storage"]["SQLite"])
-        logger.info("Synthetic Pipeline completed successfully.")
-    except Exception as e:
-        logger.error(f"Error in Synthetic Pipeline: {e}")
-
-
-def run_pipeline(start_date="2020-01-01", end_date="2025-12-31"):
-    """
-    Run the full data pipeline.
-
-    Args:
-        start_date (str): Start date for data fetching (YYYY-MM-DD).
-        end_date (str): End date for data fetching (YYYY-MM-DD).
-    """
-    logger.info("Starting full pipeline execution.")
-    run_yahoo_pipeline(start_date, end_date)
-    run_fred_pipeline(start_date, end_date)
-    run_synthetic_pipeline(start_date, end_date)
-    logger.info("Full pipeline execution completed successfully.")
+        logger.error(f"Pipeline execution failed: {e}")
 
 
 if __name__ == "__main__":
-    # Load configuration
-    with open("config/config.json", "r") as config_file:
-        config = json.load(config_file)
-
-    start_date = config["date_ranges"]["start_date"]
-    end_date = config["date_ranges"]["end_date"]
-
-    # Convert "current" to today's date
-    if end_date == "current":
-        end_date = datetime.now().strftime("%Y-%m-%d")
-    logger.info(f"Using date range: {start_date} to {end_date}")
-
-    # Run the pipeline
-    run_pipeline(start_date, end_date)
+    run_pipeline("config/config.json")

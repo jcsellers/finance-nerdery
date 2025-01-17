@@ -8,177 +8,157 @@ import vectorbt as vbt
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # Output to console
+        logging.FileHandler(
+            "logs/backtest.log", mode="w"
+        ),  # Output to logs/backtest.log
+    ],
 )
+logger = logging.getLogger("backtest_orchestrator")
 
 
-def load_config(file_path):
+def load_data(db_path, tickers, start_date, end_date):
     """
-    Load a JSON configuration file.
+    Load financial data from the SQLite database.
     """
-    with open(file_path, "r") as file:
-        return json.load(file)
+    conn = sqlite3.connect(db_path)
+    schema = pd.read_sql("PRAGMA table_info(yahoo_data);", conn)
+    date_col = schema[schema["name"].str.contains("Date", case=False, na=False)][
+        "name"
+    ].values[0]
+    symbol_col = schema[schema["name"].str.contains("symbol", case=False, na=False)][
+        "name"
+    ].values[0]
 
-
-def sanitize_column_name(name):
+    query = f"""
+        SELECT "{date_col}" AS date, "{symbol_col}" AS symbol,
+               "('SPY', 'Open')" AS open, "('SPY', 'High')" AS high,
+               "('SPY', 'Low')" AS low, "('SPY', 'Close')" AS close,
+               "('SPY', 'Volume')" AS volume
+        FROM yahoo_data
+        WHERE "{symbol_col}" IN ({','.join(f"'{t}'" for t in tickers)})
+          AND "{date_col}" BETWEEN '{start_date}' AND '{end_date}';
     """
-    Sanitize column names to replace problematic characters.
-    """
-    return name.replace("^", "_caret_").replace(" ", "_")
+    data = pd.read_sql(query, conn, parse_dates=["date"])
+    conn.close()
+
+    if data.empty:
+        logger.error("Loaded data is empty. Check database or query.")
+        raise ValueError("No data available for the specified tickers and date range.")
+
+    logger.debug(f"Loaded data shape: {data.shape}")
+    logger.debug(f"Loaded data head:\n{data.head()}")
+
+    data.set_index("date", inplace=True)
+    data = data.pivot(columns="symbol")
+    logger.info("Data loaded and pivoted for Vectorbt.")
+    logger.debug(f"Pivoted data shape: {data.shape}")
+    logger.debug(f"Pivoted data head:\n{data.head()}")
+    return data
 
 
-def generate_column_mapping(tickers):
-    """
-    Generate a dynamic column mapping based on the provided tickers.
+def run_buy_and_hold_strategy(data, initial_cash, fees):
+    close = data["close"]
 
-    Args:
-        tickers (list): List of tickers to include in the mapping.
+    # Handle missing data
+    close = close.dropna(how="all", axis=1)  # Drop tickers with no data
+    logger.debug(f"Filtered close data shape: {close.shape}")
+    logger.debug(f"Filtered close columns: {close.columns}")
 
-    Returns:
-        dict: Mapping of unconventional column names to standard names.
-    """
-    column_mapping = {"('date', '')": "date"}
-    for ticker in tickers:
-        sanitized_ticker = sanitize_column_name(ticker.lower())
-        for field in ["open", "high", "low", "close", "volume"]:
-            raw_column = f"('{ticker.lower()}', '{field}')"
-            column_mapping[raw_column] = f"{sanitized_ticker}_{field}"
-    return column_mapping
+    # Check if data is valid
+    if close.empty:
+        logger.error(
+            "No valid data available for backtesting. Skipping strategy execution."
+        )
+        raise ValueError("No valid data available for backtesting.")
 
+    # Define signals
+    entries = pd.DataFrame(False, index=close.index, columns=close.columns)
+    entries.iloc[0] = True
+    exits = pd.DataFrame(False, index=close.index, columns=close.columns)
 
-def escape_ticker(ticker):
-    """
-    Escape special characters in the ticker for SQLite queries.
-    """
-    return f"[{ticker}]"
-
-
-def load_data_from_config(config, tickers):
-    """
-    Load data for specified tickers from SQLite, applying column mapping.
-
-    Args:
-        config (dict): Configuration containing data source details.
-        tickers (list): List of tickers to load.
-
-    Returns:
-        pd.DataFrame: Combined financial data for all tickers.
-    """
-    data_frames = []
-    column_mapping = generate_column_mapping(tickers)
-
-    # Load from SQLite
-    if "SQLite" in config["storage"]:
-        try:
-            conn = sqlite3.connect(config["storage"]["SQLite"])
-            logging.info(f"Querying data from SQLite: {config['storage']['SQLite']}")
-
-            # Generate dynamic SELECT clause
-            select_clause = ", ".join(
-                [f'"{col}" AS {alias}' for col, alias in column_mapping.items()]
-            )
-            query = f"""
-                SELECT {select_clause}, ticker AS symbol
-                FROM yahoo_data
-                WHERE ticker IN ({','.join(f"'{t}'" for t in tickers)});
-            """
-            sqlite_data = pd.read_sql(query, conn, parse_dates=["date"])
-            conn.close()
-
-            if sqlite_data.empty:
-                raise ValueError("No data found for the specified tickers in SQLite.")
-
-            logging.info(f"Loaded {len(sqlite_data)} rows from SQLite.")
-            logging.info(f"Data sample after query:\n{sqlite_data.head()}")
-            data_frames.append(sqlite_data)
-        except Exception as e:
-            logging.warning(f"Failed to load data from SQLite: {e}")
-
-    if not data_frames:
-        raise ValueError("No data could be loaded from SQLite.")
-
-    combined_data = pd.concat(data_frames)
-    combined_data.set_index("date", inplace=True)
-
-    # Filter by date range
-    start_date = pd.Timestamp(config["date_ranges"]["start_date"])
-    end_date = (
-        pd.Timestamp(config["date_ranges"]["end_date"])
-        if config["date_ranges"]["end_date"] != "current"
-        else pd.Timestamp.now()
+    # Align signals to close
+    entries = entries.reindex(
+        index=close.index, columns=close.columns, fill_value=False
     )
-    combined_data = combined_data.loc[start_date:end_date]
-    logging.info(f"Data filtered for date range: {start_date} to {end_date}")
+    exits = exits.reindex(index=close.index, columns=close.columns, fill_value=False)
 
-    return combined_data
+    # Verify alignment
+    assert (
+        close.shape == entries.shape == exits.shape
+    ), f"Shape mismatch: close={close.shape}, entries={entries.shape}, exits={exits.shape}"
+
+    # Run the backtest
+    portfolio = vbt.Portfolio.from_signals(
+        close,
+        entries,
+        exits,
+        init_cash=initial_cash,
+        fees=fees,
+    )
+    logger.info("Buy-and-Hold strategy executed.")
+    return portfolio
 
 
-def run_strategy_vectorbt(data, config):
+def save_results(portfolio, output_dir):
     """
-    Run a Buy-and-Hold strategy for multiple tickers using vectorbt.
+    Save backtest results to CSV files.
 
     Args:
-        data (pd.DataFrame): Financial data.
-        config (dict): Configuration for the strategy.
-
-    Returns:
-        dict: Portfolio objects for each ticker.
+        portfolio (vbt.Portfolio): Vectorbt portfolio object.
+        output_dir (str): Directory to save the results.
     """
-    portfolios = {}
-    for ticker in config["tickers"]["Yahoo Finance"]:
-        symbol_data = data[data["symbol"] == ticker]
-        portfolios[ticker] = vbt.Portfolio.from_holding(
-            close=symbol_data["close"], init_cash=config["capital_base"]
-        )
-    return portfolios
-
-
-def orchestrate(base_config_path, strategy_config_path, config_path):
-    """
-    Orchestrate the backtesting process with multiple data sources.
-    """
-    # Load configurations
-    base_config = load_config(base_config_path)
-    strategy_config = load_config(strategy_config_path)
-    additional_config = load_config(config_path)
-
-    # Load data from SQLite and/or CSV
-    tickers = additional_config["tickers"]["Yahoo Finance"]
-    data = load_data_from_config(additional_config, tickers)
-
-    # Run strategy for each ticker
-    portfolios = run_strategy_vectorbt(data, additional_config)
-
-    # Save results for each ticker
-    output_dir = additional_config["storage"]["output_dir"]
     os.makedirs(output_dir, exist_ok=True)
-    for ticker, portfolio in portfolios.items():
-        metrics_path = os.path.join(output_dir, f"{ticker}_performance_metrics.csv")
-        portfolio.performance().to_csv(metrics_path)
-        logging.info(f"Performance metrics saved to: {metrics_path}")
 
-        dashboard_path = os.path.join(
-            output_dir, f"{ticker}_performance_dashboard.html"
-        )
-        portfolio.plot().write_html(dashboard_path)
-        logging.info(f"Performance dashboard saved to: {dashboard_path}")
+    # Save performance metrics
+    performance = portfolio.performance()
+    performance.to_csv(f"{output_dir}/performance_metrics.csv")
+    logger.info("Performance metrics saved.")
+
+    # Save portfolio value over time
+    portfolio.value().to_csv(f"{output_dir}/portfolio_value.csv")
+    logger.info("Portfolio value saved.")
+
+    # Save trades
+    trades = portfolio.trades.records
+    trades.to_csv(f"{output_dir}/trades.csv")
+    logger.info("Trades saved.")
+
+
+def orchestrate(config_path):
+    """
+    Main orchestrator function to run the backtesting pipeline.
+    """
+    with open(config_path, "r") as config_file:
+        config = json.load(config_file)
+
+    # Load configuration
+    db_path = config["storage"]["SQLite"]
+    tickers = config["tickers"]["Yahoo Finance"]
+    start_date = config["date_ranges"]["start_date"]
+    end_date = config["date_ranges"]["end_date"]
+    if end_date == "current":
+        from datetime import datetime
+
+        end_date = datetime.now().strftime("%Y-%m-%d")
+    output_dir = config["storage"]["output_dir"]
+    initial_cash = config["capital_base"]
+    fees = config.get("settings", {}).get("fees", 0.001)
+
+    # Load data
+    data = load_data(db_path, tickers, start_date, end_date)
+    logger.debug(f"Data loaded for strategy:\n{data.head()}")
+
+    # Run Buy-and-Hold strategy
+    portfolio = run_buy_and_hold_strategy(data, initial_cash, fees)
+
+    # Save results
+    save_results(portfolio, output_dir)
+    logger.info("Orchestrator completed successfully.")
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Run the backtest orchestrator.")
-    parser.add_argument(
-        "--base-config", required=True, help="Path to base_config.json."
-    )
-    parser.add_argument(
-        "--strategy-config", required=True, help="Path to strategy config."
-    )
-    parser.add_argument("--config", required=True, help="Path to additional config.")
-    args = parser.parse_args()
-
-    try:
-        orchestrate(args.base_config, args.strategy_config, args.config)
-        logging.info("Orchestrator completed successfully.")
-    except Exception as e:
-        logging.error(f"Orchestrator failed with error: {e}")
+    orchestrate("config/config.json")

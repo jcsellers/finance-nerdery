@@ -1,43 +1,100 @@
-### sqlite_utils.py
+import logging
 import sqlite3
 
 import pandas as pd
 
-from utils.logger import get_logger
+import utils.logger as logger
 
-logger = get_logger(__name__)
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
-def save_to_sqlite(db_path, table_name, dataframe):
+def create_connection(db_path):
     """
-    Save a DataFrame to an SQLite database and handle schema mismatches.
+    Create a database connection to the SQLite database.
 
     Args:
-        db_path (str): Path to the SQLite database file.
-        table_name (str): Name of the table to save data to.
-        dataframe (pd.DataFrame): DataFrame to be saved.
+        db_path (str): Path to the SQLite database.
+
+    Returns:
+        sqlite3.Connection: Database connection object.
     """
     try:
-        # Remove duplicate columns from the DataFrame
-        dataframe = dataframe.loc[:, ~dataframe.columns.duplicated()]
-
-        schema_map = {
-            "yahoo_data": "CREATE TABLE IF NOT EXISTS yahoo_data (date TEXT, ticker TEXT, open REAL, high REAL, low REAL, close REAL, volume INTEGER, PRIMARY KEY (date, ticker))",
-            "fred_data": "CREATE TABLE IF NOT EXISTS fred_data (date TEXT, ticker TEXT, value REAL, data_flag TEXT, PRIMARY KEY (date, ticker))",
-            "synthetic_cash": "CREATE TABLE IF NOT EXISTS synthetic_cash (date TEXT, value REAL, PRIMARY KEY (date))",
-            "synthetic_linear": "CREATE TABLE IF NOT EXISTS synthetic_linear (date TEXT, value REAL, PRIMARY KEY (date))",
-        }
-
-        with sqlite3.connect(db_path) as conn:
-            # Create table if schema is defined
-            if table_name in schema_map:
-                conn.execute(schema_map[table_name])
-
-            # Save the DataFrame
-            dataframe.to_sql(table_name, conn, if_exists="replace", index=False)
-            logger.info(f"Data saved to SQLite table '{table_name}' in '{db_path}'.")
-    except Exception as e:
-        logger.error(
-            f"Error saving data to SQLite (table: {table_name}, db: {db_path}): {e}"
-        )
+        conn = sqlite3.connect(db_path)
+        logger.info(f"Successfully connected to the database: {db_path}")
+        return conn
+    except sqlite3.Error as e:
+        logger.error(f"Error connecting to database: {e}")
         raise
+
+
+def execute_query(conn, query, params=None):
+    """
+    Execute a SQL query.
+
+    Args:
+        conn (sqlite3.Connection): Database connection object.
+        query (str): SQL query to execute.
+        params (tuple, optional): Query parameters.
+
+    Returns:
+        sqlite3.Cursor: Cursor object with the query results.
+    """
+    try:
+        cur = conn.cursor()
+        if params:
+            cur.execute(query, params)
+        else:
+            cur.execute(query)
+        conn.commit()
+        logger.info(f"Query executed successfully: {query}")
+        return cur
+    except sqlite3.Error as e:
+        logger.error(f"Error executing query: {e}")
+        raise
+
+
+def save_to_db(df, table_name, db_path, if_exists="replace"):
+    """
+    Save a pandas DataFrame to an SQLite database.
+
+    Args:
+        df (pd.DataFrame): DataFrame to save.
+        table_name (str): Name of the table to save the data.
+        db_path (str): Path to the SQLite database.
+        if_exists (str, optional): Action if the table already exists. Default is "replace".
+
+    Returns:
+        None
+    """
+    try:
+        conn = create_connection(db_path)
+        df.to_sql(table_name, conn, if_exists=if_exists, index=False)
+        conn.close()
+        logger.info(f"Data saved to table '{table_name}' in the database at {db_path}")
+    except sqlite3.Error as e:
+        logger.error(f"Error saving data to database: {e}")
+        raise
+    except ValueError as ve:
+        logger.error(f"ValueError while saving to database: {ve}")
+        raise
+
+
+def clean_column_names(df):
+    """
+    Clean column names by converting them to lowercase and replacing spaces with underscores.
+
+    Args:
+        df (pd.DataFrame): DataFrame whose column names need cleaning.
+
+    Returns:
+        pd.DataFrame: DataFrame with cleaned column names.
+    """
+    df.columns = (
+        df.columns.str.lower()
+        .str.replace(" ", "_")
+        .str.replace("(", "")
+        .str.replace(")", "")
+    )
+    logger.info("Column names cleaned successfully.")
+    return df

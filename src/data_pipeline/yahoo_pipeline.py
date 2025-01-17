@@ -1,77 +1,110 @@
 import logging
-import sqlite3
+import time
 
 import pandas as pd
 import yfinance as yf
 
-logger = logging.getLogger(__name__)
+from utils.sqlite_utils import clean_column_names
+from utils.validation import validate_date_ranges
+
+# Configure logging
+logger = logging.getLogger("yahoo_pipeline")
 
 
 class YahooPipeline:
-    def __init__(self, retry_attempts=3):
-        """
-        Initialize the Yahoo data pipeline.
+    def __init__(self, start_date, end_date, tickers, max_retries=3, backoff_factor=2):
+        self.start_date = start_date
+        self.end_date = end_date
+        self.tickers = tickers
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
 
-        Args:
-            retry_attempts (int): Number of retry attempts for fetching data.
-        """
-        self.retry_attempts = retry_attempts
+    def fetch_data(self, ticker):
+        logger.info(f"Fetching data for ticker: {ticker}")
+        retries = 0
+        while retries < self.max_retries:
+            try:
+                data = yf.download(ticker, start=self.start_date, end=self.end_date)
+                if data.empty:
+                    logger.warning(f"No data returned for ticker: {ticker}")
+                    return pd.DataFrame()
 
-    def fetch_data(self, tickers, start_date, end_date):
-        """
-        Fetch data from Yahoo Finance.
+                # Log structure and sample of the fetched data
+                logger.debug(
+                    f"Fetched data structure for {ticker}: {str(data.info())}\nSample Data:\n{data.head()}"
+                )
 
-        Args:
-            tickers (list): List of tickers to fetch.
-            start_date (str): Start date for data fetching (YYYY-MM-DD).
-            end_date (str): End date for data fetching (YYYY-MM-DD).
+                # Always reset the index and inspect columns
+                data.reset_index(inplace=True)
 
-        Returns:
-            pd.DataFrame: Combined financial data for all tickers.
-        """
-        all_data = []
-        for ticker in tickers:
-            for attempt in range(self.retry_attempts):
-                try:
-                    logger.info(
-                        f"Fetching data for ticker: {ticker}, attempt: {attempt + 1}"
+                # Handle typical date-related columns or use the index as fallback
+                potential_date_columns = ["Date", "Datetime"]
+                if any(col in data.columns for col in potential_date_columns):
+                    date_col = next(
+                        (col for col in potential_date_columns if col in data.columns),
+                        None,
                     )
-                    data = yf.download(
-                        ticker, start=start_date, end=end_date, group_by="ticker"
+                    data.rename(columns={date_col: "date"}, inplace=True)
+                else:
+                    logger.warning(
+                        "No standard 'date' column found; using index as 'date'."
                     )
-                    if data.empty:
-                        logger.warning(f"No data fetched for ticker: {ticker}")
-                        break
-                    data["symbol"] = ticker
-                    all_data.append(
-                        data.reset_index()
-                    )  # Ensure 'date' column is included
-                    break
-                except Exception as e:
-                    logger.error(f"Error fetching data for ticker {ticker}: {e}")
-                    if attempt == self.retry_attempts - 1:
-                        logger.warning(
-                            f"Max retries reached for ticker: {ticker}. Skipping."
+                    if "index" in data.columns:
+                        data.rename(columns={"index": "date"}, inplace=True)
+                    else:
+                        data.insert(
+                            0, "date", pd.to_datetime(data.index, errors="coerce")
                         )
+
+                # Ensure 'date' column exists and is valid
+                if "date" not in data.columns:
+                    raise ValueError(
+                        f"No valid 'date' column found in the data for ticker {ticker}."
+                    )
+
+                data["date"] = pd.to_datetime(data["date"], errors="coerce")
+                if data["date"].isna().all():
+                    raise ValueError(
+                        f"All values in 'date' column are invalid for ticker {ticker}."
+                    )
+                data.dropna(
+                    subset=["date"], inplace=True
+                )  # Drop rows with invalid dates
+                data["symbol"] = ticker
+                return data
+            except Exception as e:
+                logger.error(f"Failed attempt {retries + 1} for ticker {ticker}: {e}")
+                retries += 1
+                time.sleep(self.backoff_factor**retries)  # Exponential backoff
+
+        logger.error(f"Max retries reached. Could not fetch data for ticker {ticker}.")
+        return pd.DataFrame()
+
+    def run(self):
+        all_data = []
+        for ticker in self.tickers:
+            data = self.fetch_data(ticker)
+            if not data.empty:
+                all_data.append(data)
+
         if not all_data:
-            raise ValueError("No data was fetched from Yahoo Finance.")
-        return pd.concat(all_data, ignore_index=True)
+            logger.warning("No data fetched for Yahoo Finance tickers.")
+            return pd.DataFrame()
 
-    def save_data(self, db_path, table_name, data):
-        """
-        Save data to an SQLite database.
+        # Combine and clean data
+        combined_data = pd.concat(all_data, ignore_index=True)
+        logger.info("Data combined successfully.")
 
-        Args:
-            db_path (str): Path to the SQLite database.
-            table_name (str): Table name to save data.
-            data (pd.DataFrame): Data to save.
-        """
-        try:
-            conn = sqlite3.connect(db_path)
-            data.to_sql(table_name, conn, if_exists="replace", index=False)
-            conn.close()
-            logger.info(
-                f"Data saved to SQLite database: {db_path}, table: {table_name}"
-            )
-        except Exception as e:
-            logger.error(f"Error saving data to database: {e}")
+        # Reset index and ensure column names are strings
+        if isinstance(combined_data.index, pd.MultiIndex):
+            combined_data = combined_data.reset_index()
+
+        combined_data.columns = [str(col) for col in combined_data.columns]
+
+        # Clean and validate
+        combined_data = clean_column_names(combined_data)
+        combined_data = validate_date_ranges(
+            combined_data, self.start_date, self.end_date
+        )
+        logger.info("Data cleaned and validated for Yahoo Finance.")
+        return combined_data

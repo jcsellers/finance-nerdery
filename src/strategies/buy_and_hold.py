@@ -1,80 +1,87 @@
+import logging
+import sqlite3
+
 import pandas as pd
-from zipline.api import (
-    order,
-    record,
-    set_commission,
-    set_max_leverage,
-    set_slippage,
-    symbol,
-)
-from zipline.finance.commission import PerShare
-from zipline.finance.slippage import FixedSlippage
+import vectorbt as vbt
 
-
-def initialize(context):
-    """
-    Called once at the start of the simulation.
-    Sets up the context variables and schedules functions.
-    """
-    context.asset = symbol(context.params["target_asset"])
-    context.has_ordered = False
-
-    # Set commission and slippage models
-    set_commission(PerShare(cost=context.params.get("commission", 0.005)))
-    set_slippage(FixedSlippage(spread=context.params.get("slippage", 0.01)))
-
-    # Set maximum leverage
-    set_max_leverage(context.params.get("max_leverage", 1.0))
-
-
-def handle_data(context, data):
-    """
-    Called once per bar (minute, daily, etc.).
-    Buys the target asset once at the beginning.
-    """
-    if not context.has_ordered:
-        try:
-            # Ensure price data is available
-            price = data.current(context.asset, "price")
-            if pd.isna(price):
-                # Skip this iteration if price is NaN
-                print(f"No price data available for {context.asset}. Skipping order.")
-                return
-
-            # Place the order
-            order(
-                context.asset,
-                int(context.portfolio.cash / price),
-            )
-            context.has_ordered = True
-            record(order_size=int(context.portfolio.cash / price))
-
-        except KeyError as e:
-            print(f"Error: Asset {context.asset} not found in data. {e}")
-        except Exception as e:
-            print(f"Unexpected error in handle_data: {e}")
+logger = logging.getLogger("backtest_orchestrator")
 
 
 def run_strategy(config):
+
+    print("Buy-and-Hold strategy script is running.")
+    print("Buy-and-Hold strategy script is running.")
+    print("Buy-and-Hold strategy script is running.")
+
     """
-    Run the Buy-and-Hold strategy.
+    Run the Buy-and-Hold strategy using Vectorbt.
 
     Args:
         config (dict): Configuration for the strategy.
 
     Returns:
-        pd.DataFrame: Backtest results.
+        vbt.Portfolio: Vectorbt portfolio object.
     """
-    from datetime import datetime
+    # Load the data
+    db_path = config["db_path"]
+    target_asset = config["target_asset"]
+    start_date = config["start_date"]
+    end_date = config["end_date"]
 
-    from zipline import run_algorithm
+    conn = sqlite3.connect(db_path)
+    query = f"""
+        SELECT "('Date', '')" AS date, "('SPY', 'Close')" AS close
+        FROM yahoo_data
+        WHERE "('symbol', '')" = '{target_asset}'
+          AND "('Date', '')" BETWEEN '{start_date}' AND '{end_date}';
+    """
+    data = pd.read_sql(query, conn, parse_dates=["date"])
+    conn.close()
 
-    return run_algorithm(
-        start=datetime.strptime(config["start_date"], "%Y-%m-%d"),
-        end=datetime.strptime(config["end_date"], "%Y-%m-%d"),
-        initialize=initialize,
-        handle_data=handle_data,
-        capital_base=config.get("capital_base", 100000),
-        data_frequency="daily",
-        bundle=config["bundle"],
+    if data.empty:
+        logger.error(
+            f"No data available for {target_asset} in the specified date range."
+        )
+        raise ValueError(
+            f"No data available for {target_asset} in the specified date range."
+        )
+
+    # Start from the first available trading day
+    data.set_index("date", inplace=True)
+    close = data["close"].sort_index()
+
+    # Debugging: Log the shape and preview of close data
+    logger.debug(f"Close data shape: {close.shape}")
+    logger.debug(f"Close data head:\n{close.head()}")
+
+    # Define buy-and-hold signals
+    entries = pd.DataFrame(False, index=close.index, columns=[target_asset])
+    entries.iloc[0] = True  # Buy on the first available date
+    exits = pd.DataFrame(False, index=close.index, columns=[target_asset])  # Never sell
+
+    # Align entries and exits to close
+    entries = entries.reindex(
+        index=close.index, columns=close.columns, fill_value=False
     )
+    exits = exits.reindex(index=close.index, columns=close.columns, fill_value=False)
+
+    # Debugging: Log the shape and preview of entries and exits
+    logger.debug(f"Entries shape: {entries.shape}, Exits shape: {exits.shape}")
+    logger.debug(f"Entries head:\n{entries.head()}")
+    logger.debug(f"Exits head:\n{exits.head()}")
+
+    # Verify alignment
+    assert (
+        close.shape == entries.shape == exits.shape
+    ), f"Shape mismatch: close={close.shape}, entries={entries.shape}, exits={exits.shape}"
+
+    # Run the backtest
+    portfolio = vbt.Portfolio.from_signals(
+        close,
+        entries,
+        exits,
+        init_cash=config.get("capital_base", 100000),
+        fees=config.get("fees", 0.001),
+    )
+    logger.info("Buy-and-Hold strategy executed.")
+    return portfolio
