@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 import yfinance as yf
 
-from src.utils import fill_missing_market_days
+from utils import fill_missing_market_days
 
 
 def fetch_yfinance_data(
