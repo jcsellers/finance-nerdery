@@ -1,26 +1,35 @@
 {
     "tickers": {
         "yfinance": ["UPRO", "SSO", "SPY", "GLD", "TLT"],
-        "FRED": ["BAMLH0A0HYM2","DGS10", "VIXCLS"]
-      },
+        "FRED": ["BAMLH0A0HYM2", "DGS10", "VIXCLS"]
+    },
     "aliases": {
         "FRED": {
-        "BAMLH0A0HYM2": "OAS Spread",
-        "DGS10": "10 Year Treasury Yield",
-        "VIXCLS": "CBOE Volatility Index"
-    }
+            "BAMLH0A0HYM2": "OAS Spread",
+            "DGS10": "10 Year Treasury Yield",
+            "VIXCLS": "CBOE Volatility Index"
+        }
     },
     "date_ranges": {
         "start_date": "2020-01-02",
         "end_date": "current"
     },
     "storage": {
-        "SQLite": "data/finance_data.db",
-        "CSV": "data/csv_files/",
-        "output_dir": "output/"
+        "MongoDB": {
+            "connection_string": "mongodb://localhost:27017/",
+            "database": "finance_nerdery",
+            "collections": {
+                "raw_data": "raw_financial_data",
+                "error_logs": "ingestion_errors"
+            }
+        },
+        "Parquet": {
+            "directory": "data/parquet_files/"
+        }
     },
     "settings": {
         "retry_count": 3,
+        "retry_delay": 5,
         "log_level": "verbose",
         "timezone": "UTC"
     },
@@ -38,12 +47,6 @@
             "start_value": 1.0,
             "growth_rate": 0.01
         }
-    },
-    "bundle": "custom_bundle",
-    "start_date": "2020-01-02",
-    "end_date": "2022-12-31",
-    "strategy": {
-        "name": "buy_and_hold"
     },
     "capital_base": 100000
 }
