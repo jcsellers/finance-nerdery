@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
-
 from synthetic_pipeline import SyntheticPipeline
 
 

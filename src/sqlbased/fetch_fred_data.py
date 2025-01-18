@@ -6,7 +6,6 @@ from datetime import datetime
 import pandas as pd
 import pandas_market_calendars as mcal
 from fredapi import Fred
-
 from utils import fill_missing_market_days
 
 
