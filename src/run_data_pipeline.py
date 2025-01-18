@@ -7,6 +7,19 @@ from dotenv import load_dotenv
 
 from yfinance_fetcher import fetch_yfinance_data
 
+# Define the log directory and file
+log_dir = "../logs"
+log_file = os.path.join(log_dir, "pipeline.log")
+
+# Ensure the log directory exists
+os.makedirs(log_dir, exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
+)
 
 # Placeholder for future fetchers
 def fetch_fred_data(tickers, start_date, end_date, db_path, intermediate_dir):
