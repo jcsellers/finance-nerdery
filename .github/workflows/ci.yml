@@ -65,13 +65,6 @@ jobs:
           ls -l $(pwd)/config/
           ls -l $(pwd)/data/
 
-      - name: Run Configuration Tests
-        env:
-          PYTHONPATH: ${{ env.PYTHONPATH }}
-        run: |
-          pytest tests/test_parser.py --maxfail=5 --disable-warnings
-          pytest tests/test_utils.py --maxfail=5 --disable-warnings
-          pytest tests/test_pipelines.py --maxfail=5 --disable-warnings
       - name: Run All Tests
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
