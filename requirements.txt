@@ -13,6 +13,6 @@ autoflake
 isort
 python-dotenv
 pytest-mock
-quantstats
 vectorbt
 alpha-vantage
+pandas_market_calendars

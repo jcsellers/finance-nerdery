@@ -1,0 +1,209 @@
+import unittest
+from unittest.mock import patch, MagicMock
+import pandas as pd
+import sqlite3
+import os
+from fetch_fred_pipeline import fetch_fred_data
+
+class TestFetchFredData(unittest.TestCase):
+
+    @patch("fetch_fred_pipeline.Fred")
+    @patch("fetch_fred_pipeline.fill_missing_market_days")
+    def test_successful_data_fetch_and_insert(self, mock_fill_missing_market_days, mock_fred):
+        # Mock FRED API response
+        mock_fred_instance = MagicMock()
+        mock_fred_instance.get_series.return_value = pd.Series(
+            [1.0, 2.0, 3.0], index=pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"])
+        )
+        mock_fred.return_value = mock_fred_instance
+
+        # Mock fill_missing_market_days
+        mock_fill_missing_market_days.return_value = pd.DataFrame({
+            "Date": pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"]),
+            "value": [1.0, 2.0, 3.0]
+        })
+
+        # Setup in-memory SQLite database
+        db_path = ":memory:"
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE economic_data (
+                Date DATETIME,
+                value REAL,
+                symbol TEXT,
+                alias TEXT,
+                source TEXT,
+                is_filled BOOLEAN
+            )
+            """
+        )
+        conn.commit()
+
+        # Test inputs
+        tickers = ["TEST_TICKER"]
+        start_date = "2023-01-01"
+        end_date = "2023-01-03"
+        aliases = {"TEST_TICKER": "Test Alias"}
+
+        # Run the function
+        fetch_fred_data(tickers, start_date, end_date, db_path, aliases)
+
+        # Validate database entries
+        cursor.execute("SELECT * FROM economic_data")
+        rows = cursor.fetchall()
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0][2], "TEST_TICKER")  # Check symbol
+        self.assertEqual(rows[0][3], "Test Alias")   # Check alias
+
+        conn.close()
+
+    @patch("fetch_fred_pipeline.Fred")
+    def test_missing_api_key(self, mock_fred):
+        # Remove FRED_API_KEY from the environment
+        if "FRED_API_KEY" in os.environ:
+            del os.environ["FRED_API_KEY"]
+
+        with self.assertRaises(ValueError) as context:
+            fetch_fred_data(["TEST_TICKER"], "2023-01-01", "2023-01-03", ":memory:", {})
+
+        self.assertEqual(str(context.exception), "FRED_API_KEY is not set in the environment.")
+
+    @patch("fetch_fred_pipeline.Fred")
+    def test_negative_values_handling(self, mock_fred):
+        # Mock FRED API response with negative values
+        mock_fred_instance = MagicMock()
+        mock_fred_instance.get_series.return_value = pd.Series(
+            [-1.0, 2.0, -3.0], index=pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"])
+        )
+        mock_fred.return_value = mock_fred_instance
+
+        # Setup in-memory SQLite database
+        db_path = ":memory:"
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE economic_data (
+                Date DATETIME,
+                value REAL,
+                symbol TEXT,
+                alias TEXT,
+                source TEXT,
+                is_filled BOOLEAN
+            )
+            """
+        )
+        conn.commit()
+
+        # Test inputs
+        tickers = ["TEST_TICKER"]
+        start_date = "2023-01-01"
+        end_date = "2023-01-03"
+        aliases = {"TEST_TICKER": "Test Alias"}
+
+        # Run the function
+        fetch_fred_data(tickers, start_date, end_date, db_path, aliases)
+
+        # Validate database entries
+        cursor.execute("SELECT * FROM economic_data")
+        rows = cursor.fetchall()
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0][1], None)  # Negative value adjusted to None
+        self.assertEqual(rows[1][1], 2.0)   # Positive value remains
+        self.assertEqual(rows[2][1], None)  # Negative value adjusted to None
+
+        conn.close()
+
+    @patch("fetch_fred_pipeline.Fred")
+    @patch("fetch_fred_pipeline.fill_missing_market_days")
+    def test_empty_data_handling(self, mock_fill_missing_market_days, mock_fred):
+        # Mock FRED API response with empty data
+        mock_fred_instance = MagicMock()
+        mock_fred_instance.get_series.return_value = pd.Series(dtype="float64")
+        mock_fred.return_value = mock_fred_instance
+
+        # Mock fill_missing_market_days
+        mock_fill_missing_market_days.return_value = pd.DataFrame(columns=["Date", "value"])
+
+        # Setup in-memory SQLite database
+        db_path = ":memory:"
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE economic_data (
+                Date DATETIME,
+                value REAL,
+                symbol TEXT,
+                alias TEXT,
+                source TEXT,
+                is_filled BOOLEAN
+            )
+            """
+        )
+        conn.commit()
+
+        # Test inputs
+        tickers = ["TEST_TICKER"]
+        start_date = "2023-01-01"
+        end_date = "2023-01-03"
+        aliases = {"TEST_TICKER": "Test Alias"}
+
+        # Run the function
+        fetch_fred_data(tickers, start_date, end_date, db_path, aliases)
+
+        # Validate database entries
+        cursor.execute("SELECT * FROM economic_data")
+        rows = cursor.fetchall()
+        self.assertEqual(len(rows), 0)  # No data should be inserted
+
+        conn.close()
+
+    @patch("fetch_fred_pipeline.Fred")
+    def test_partial_data_handling(self, mock_fred):
+        # Mock FRED API response with sparse data
+        mock_fred_instance = MagicMock()
+        mock_fred_instance.get_series.return_value = pd.Series(
+            [1.0, None, 3.0], index=pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"])
+        )
+        mock_fred.return_value = mock_fred_instance
+
+        # Setup in-memory SQLite database
+        db_path = ":memory:"
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE economic_data (
+                Date DATETIME,
+                value REAL,
+                symbol TEXT,
+                alias TEXT,
+                source TEXT,
+                is_filled BOOLEAN
+            )
+            """
+        )
+        conn.commit()
+
+        # Test inputs
+        tickers = ["TEST_TICKER"]
+        start_date = "2023-01-01"
+        end_date = "2023-01-03"
+        aliases = {"TEST_TICKER": "Test Alias"}
+
+        # Run the function
+        fetch_fred_data(tickers, start_date, end_date, db_path, aliases)
+
+        # Validate database entries
+        cursor.execute("SELECT * FROM economic_data")
+        rows = cursor.fetchall()
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[1][1], None)  # Missing value remains None
+
+        conn.close()
+
+if __name__ == "__main__":
+    unittest.main()
