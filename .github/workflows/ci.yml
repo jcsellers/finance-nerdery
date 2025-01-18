@@ -52,7 +52,6 @@ jobs:
           pip install -r requirements.txt
       - name: Set Environment Variables
         run: |
-          echo "ZIPLINE_ROOT=$(pwd)/data/zipline_root" >> $GITHUB_ENV
           echo "PYTHONPATH=$(pwd)/src:$(pwd)/tests" >> $GITHUB_ENV
           echo "CONFIG_PATH=$(pwd)/config/config.json" >> $GITHUB_ENV
           echo "DB_PATH=$(pwd)/data/finance_data.db" >> $GITHUB_ENV
@@ -63,9 +62,6 @@ jobs:
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
         run: |
-          pytest tests/test_parser.py --maxfail=5 --disable-warnings
-          pytest tests/test_utils.py --maxfail=5 --disable-warnings
-          pytest tests/test_pipelines.py --maxfail=5 --disable-warnings
       - name: Run All Tests
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
