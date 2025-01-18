@@ -1,11 +1,12 @@
+import argparse
 import os
 import sqlite3
+
+from dotenv import load_dotenv
 
 
 def load_environment_variables(env_path=".env"):
     """Load environment variables from a .env file."""
-    from dotenv import load_dotenv
-
     load_dotenv(env_path)
 
 
@@ -19,30 +20,52 @@ def setup_database(db_path, schemas):
         # Ensure the database directory exists
         db_directory = os.path.dirname(db_path)
         if not os.path.exists(db_directory):
-            os.makedirs(db_directory)
+            try:
+                os.makedirs(db_directory)
+            except OSError as e:
+                raise OSError(f"Failed to create directory {db_directory}: {e}")
 
         # Connect to SQLite database
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
 
-        # Execute schema creation scripts
-        for table_name, schema in schemas.items():
-            cursor.execute(schema)
+            # Execute schema creation scripts
+            for table_name, schema in schemas.items():
+                try:
+                    cursor.execute(schema)
+                    print(f"Table {table_name} created or already exists.")
+                except sqlite3.Error as e:
+                    print(f"Error creating table {table_name}: {e}")
 
-        # Commit changes and close connection
-        conn.commit()
-        conn.close()
+            conn.commit()
         print("Database setup successful.")
     except Exception as e:
         print(f"Error setting up database: {e}")
 
 
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Setup SQLite database with predefined schemas."
+    )
+    parser.add_argument(
+        "--env_path", type=str, default=".env", help="Path to the .env file"
+    )
+    parser.add_argument(
+        "--db_path", type=str, help="Path to the SQLite database", default=None
+    )
+    args = parser.parse_args()
+
     # Load environment variables
-    load_environment_variables()
+    load_environment_variables(args.env_path)
 
     # Define database path and schemas
-    db_path = os.getenv("DB_PATH")
+    db_path = args.db_path or os.getenv("DB_PATH")
+    if not db_path:
+        raise ValueError(
+            "DB_PATH environment variable is not set and no --db_path argument provided."
+        )
+
     schemas = {
         "historical_data": """
             CREATE TABLE IF NOT EXISTS historical_data (
