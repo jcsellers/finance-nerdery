@@ -5,14 +5,13 @@ import pandas as pd
 
 from DataPipeline import DataPipeline
 
-# Determine the absolute path of the config file
-config_path = os.path.abspath("../config/fred_test_config.json")
+# Load the FRED test configuration
+config_path = os.path.abspath("./config/fred_test_config.json")
 
 # Check if the config file exists
 if not os.path.exists(config_path):
     raise FileNotFoundError(f"Config file not found at {config_path}")
 
-# Load the FRED test configuration
 with open(config_path, "r") as config_file:
     config = json.load(config_file)
 
@@ -39,10 +38,19 @@ for ticker, alias in config["aliases"]["FRED"].items():
         try:
             import vectorbt as vbt
 
-            portfolio = vbt.Portfolio.from_ohlcv(ohlcv_df)
-            print(portfolio.performance())
+            # Create a portfolio using vectorbt
+            portfolio = vbt.Portfolio.from_signals(
+                close=ohlcv_df["Close"],
+                entries=ohlcv_df["Close"]
+                > ohlcv_df["Close"].shift(1),  # Example entry condition
+                exits=ohlcv_df["Close"]
+                < ohlcv_df["Close"].shift(1),  # Example exit condition
+            )
+            print(portfolio.total_return())
             portfolio.plot().show()
         except ImportError:
             print("vectorbt is not installed. Skipping portfolio analysis.")
+        except Exception as e:
+            print(f"Error analyzing data with vectorbt: {e}")
     else:
         print(f"Output file {csv_path} not found. Ensure the pipeline ran correctly.")
