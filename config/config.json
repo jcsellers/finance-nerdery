@@ -21,13 +21,12 @@
         }
     },
     "date_ranges": {
-        "start_date": "2020-01-01",
+        "start_date": "2020-01-02",
         "end_date": "current"
     },
     "storage": {
-        "SQLite": "data/finance_data.db",
-        "CSV": "data/csv_files/",
-        "output_dir": "output/"
+        "CSV": "output/",
+        "log_dir": "logs/"
     },
     "settings": {
         "retry_count": 3,
@@ -35,22 +34,15 @@
         "timezone": "UTC"
     },
     "FRED": {
-        "api_key": "your_fred_api_key"
+        "api_key_env_var": "FRED_API_KEY"
     },
-    "Synthetic Data": {
-        "syn_cash": {
+    "synthetic_data": {
+        "cash": {
             "start_value": 1.0
         },
-        "syn_linear": {
+        "linear": {
             "start_value": 1.0,
             "growth_rate": 0.01
         }
-    },
-    "bundle": "custom_bundle",
-    "start_date": "2020-01-01",
-    "end_date": "2022-12-31",
-    "strategy": {
-        "name": "buy_and_hold"
-    },
-    "capital_base": 100000
+    }
 }
