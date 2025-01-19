@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies for linting
         run: |
           python -m pip install --upgrade pip
           pip install flake8 isort black autoflake autopep8
@@ -34,6 +34,7 @@ jobs:
       - name: Run isort
         run: |
           isort src tests scripts
+
   test:
     runs-on: ubuntu-latest
     needs: lint
@@ -50,19 +51,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Set Environment Variables
         run: |
           echo "PYTHONPATH=$(pwd)/src:$(pwd)/tests" >> $GITHUB_ENV
           echo "CONFIG_PATH=$(pwd)/config/config.json" >> $GITHUB_ENV
           echo "DB_PATH=$(pwd)/data/finance_data.db" >> $GITHUB_ENV
+
+      - name: Verify Config and Data Files
+        run: |
           ls -l $(pwd)/config/
           ls -l $(pwd)/data/
 
-      - name: Run Configuration Tests
-        env:
-          PYTHONPATH: ${{ env.PYTHONPATH }}
-        run: |
-      - name: Run All Tests
+      - name: Run Tests
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
