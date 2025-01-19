@@ -1,8 +1,8 @@
 import json
 import logging
 import os
-import time
-from urllib.error import URLError
+from functools import wraps
+from time import sleep
 
 import pandas as pd
 from fredapi import Fred
@@ -16,77 +16,119 @@ logging.basicConfig(
 logger = logging.getLogger("FredFetcher")
 
 
+def retry_on_failure(retries=3, delay=5):
+    """
+    Decorator to retry a function in case of failure.
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < retries:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempts += 1
+                    logger.warning(
+                        f"Error: {e}. Retrying {attempts}/{retries} in {delay} seconds...",
+                        exc_info=True,
+                    )
+                    sleep(delay * (2 ** (attempts - 1)))  # Exponential backoff
+            logger.error(f"Failed after {retries} attempts.")
+            raise Exception(f"Failed after {retries} attempts.")
+
+        return wrapper
+
+    return decorator
+
+
 class FredFetcher:
-    def __init__(self, config_path="config/config.json"):
+    def __init__(self, config_path):
         self.config_path = config_path
         self.api_key = os.getenv("FRED_API_KEY")
         if not self.api_key:
             logger.error(
-                "FRED API key not found. Please set FRED_API_KEY in your .env file."
+                "FRED API key not found. Please set FRED_API_KEY in your environment."
             )
             raise ValueError(
-                "FRED API key not found. Please set FRED_API_KEY in your .env file."
+                "FRED API key not found. Please set FRED_API_KEY in your environment."
             )
         self.fred = Fred(api_key=self.api_key)
 
-    def fetch_with_retries(self, ticker, retries=3, delay=2):
+    @retry_on_failure(retries=5, delay=10)
+    def fetch_series(self, ticker):
         """
-        Fetch FRED data with retry logic for network resilience.
+        Fetch a single FRED series with retry logic.
         """
-        for attempt in range(retries):
-            try:
-                logger.info(
-                    f"Fetching FRED data for ticker: {ticker} (Attempt {attempt + 1})"
-                )
-                data = self.fred.get_series(ticker)
-                return data
-            except URLError as e:
-                logger.warning(f"Retry {attempt + 1} for ticker {ticker} due to: {e}")
-                time.sleep(delay * (2**attempt))  # Exponential backoff
-            except Exception as e:
-                logger.error(
-                    f"Unexpected error for ticker {ticker}: {e}", exc_info=True
-                )
-                break
-        logger.error(
-            f"Failed to fetch data for ticker {ticker} after {retries} retries."
-        )
-        return None
+        logger.info(f"Fetching FRED series: {ticker}")
+        try:
+            data = self.fred.get_series(ticker)
+            if data is None or data.empty:
+                logger.warning(f"No data returned for {ticker}.")
+                return pd.DataFrame()
 
-    def fetch_data(self):
-        """
-        Fetch data for all FRED tickers and return as a DataFrame.
-        """
-        fred_data = []
+            data = data.reset_index()
+            data.columns = ["date", "value"]
+            data["fred_ticker"] = ticker
+            return data
+        except Exception as e:
+            logger.error(f"Error fetching series {ticker}: {e}", exc_info=True)
+            raise
 
+    def fetch_data(self, start_date=None):
+        """
+        Fetch data for all FRED tickers specified in the config file.
+        Optionally filter by start_date.
+        """
         try:
             tickers, aliases = self._load_config()
         except Exception as e:
             logger.error(f"Failed to load config: {e}", exc_info=True)
             return pd.DataFrame()
 
+        all_data = []
+        validation_dir = os.path.join(
+            "data/validation_reports"
+        )  # Adjust path as needed
+        os.makedirs(validation_dir, exist_ok=True)
+
         for ticker in tickers:
-            data = self.fetch_with_retries(ticker)
-            if data is None:
-                continue
+            try:
+                series_data = self.fetch_series(ticker)
+                if series_data.empty:
+                    continue
 
-            alias = aliases.get(ticker, ticker)
-            df = pd.DataFrame(data, columns=["value"])
-            df["date"] = df.index
-            df["fred_ticker"] = ticker
-            df["alias"] = alias
-            fred_data.append(df)
-            logger.info(f"Fetched {len(df)} rows for ticker: {ticker}")
+                alias = aliases.get(ticker, ticker)
+                series_data["alias"] = alias
 
-        if not fred_data:
+                # Filter by start_date if provided
+                if start_date:
+                    series_data["date"] = pd.to_datetime(series_data["date"])
+                    series_data = series_data[
+                        series_data["date"] >= pd.to_datetime(start_date)
+                    ]
+                    logger.info(
+                        f"Filtered data for {ticker} starting from {start_date}."
+                    )
+
+                # Validate the data
+                validate_data(series_data, validation_dir, ticker)
+
+                all_data.append(series_data)
+                logger.info(f"Fetched {len(series_data)} rows for ticker: {ticker}")
+            except Exception as e:
+                logger.error(f"Failed to fetch data for {ticker}: {e}", exc_info=True)
+
+        if all_data:
+            combined_data = pd.concat(all_data, ignore_index=True)
+            logger.info(
+                f"Fetched data combined into a single DataFrame with {len(combined_data)} rows."
+            )
+            return combined_data
+        else:
             logger.warning("No data fetched for any FRED tickers.")
             return pd.DataFrame()
-
-        combined_data = pd.concat(fred_data, ignore_index=True)
-        logger.info(
-            f"Fetched data combined into a single DataFrame with {len(combined_data)} rows."
-        )
-        return combined_data
 
     def _load_config(self):
         """
@@ -114,14 +156,32 @@ class FredFetcher:
         return data
 
 
-# Example Usage
-if __name__ == "__main__":
-    try:
-        fetcher = FredFetcher(config_path="config/config.json")
-        fred_data = fetcher.fetch_data()
-        if not fred_data.empty:
-            output_path = "data/output/fred_data.csv"
-            fred_data.to_csv(output_path, index=False)
-            logger.info(f"FRED data saved to {output_path}.")
-    except Exception as e:
-        logger.error(f"Failed to fetch or save FRED data: {e}", exc_info=True)
+def validate_data(data, output_dir, name):
+    """
+    Validate the data and save validation reports.
+    """
+    logger.info(f"Validating data for {name}...")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Generate summary statistics
+    summary = data.describe(include="all")
+    summary_path = os.path.join(output_dir, f"{name}_summary.csv")
+    summary.to_csv(summary_path)
+    logger.info(f"Summary statistics saved to {summary_path}.")
+
+    # Check for missing values
+    missing = data.isnull().sum()
+    missing_path = os.path.join(output_dir, f"{name}_missing.csv")
+    missing.to_csv(missing_path, header=["missing_count"])
+    logger.info(f"Missing values report saved to {missing_path}.")
+
+    # Check for anomalies (e.g., zero or negative values in numeric columns)
+    anomalies = {}
+    for col in data.select_dtypes(include=["number"]).columns:
+        anomalies[col] = {
+            "zero_values": (data[col] == 0).sum(),
+            "negative_values": (data[col] < 0).sum(),
+        }
+    anomalies_path = os.path.join(output_dir, f"{name}_anomalies.csv")
+    pd.DataFrame(anomalies).to_csv(anomalies_path)
+    logger.info(f"Anomalies report saved to {anomalies_path}.")
