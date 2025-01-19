@@ -16,3 +16,6 @@ pytest-mock>=3.10
 vectorbt>=0.2.4
 pandas-market-calendar
 pandas-datareader
+pytest-mock>=3.10
+coverage>=7.2
+pytest-cov>=4.0

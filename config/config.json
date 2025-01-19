@@ -28,10 +28,12 @@
         "CSV": "output/",
         "log_dir": "logs/"
     },
+    "output_dir": "output/",
     "settings": {
         "retry_count": 3,
         "log_level": "verbose",
-        "timezone": "UTC"
+        "timezone": "UTC",
+        "missing_data_handling": "interpolate"
     },
     "FRED": {
         "api_key_env_var": "FRED_API_KEY"
