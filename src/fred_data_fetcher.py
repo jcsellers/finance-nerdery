@@ -1,7 +1,7 @@
 import os
+import time
 
 import pandas as pd
-import pandas_market_calendars as mcal
 from fredapi import Fred
 
 
@@ -21,21 +21,36 @@ class FredFetcher:
         os.makedirs(self.cache_dir, exist_ok=True)
 
     def fetch_data(self, series_id, start_date, end_date):
-        retry_count = 3  # Number of retries
-        retry_delay = 5  # Delay in seconds between retries
+        retry_count = 3
+        retry_delay = 5
+
+        cache_file = os.path.join(
+            self.cache_dir, f"{series_id}_{start_date}_{end_date}.csv"
+        )
+        if os.path.exists(cache_file):
+            print(f"Loading cached data for {series_id} from {cache_file}")
+            return pd.read_csv(cache_file, index_col="Date", parse_dates=True)
 
         for attempt in range(retry_count):
             try:
-                # Attempt to fetch the data
+                print(
+                    f"Fetching data for series_id: {series_id} (Attempt {attempt + 1})"
+                )
                 series = self.fred.get_series(
                     series_id, observation_start=start_date, observation_end=end_date
                 )
                 df = series.reset_index()
                 df.columns = ["Date", "Value"]
                 df.set_index("Date", inplace=True)
+
+                # Cache the data
+                print(f"Caching data to {cache_file}")
+                df.to_csv(cache_file)
+
+                print(f"Fetched data for {series_id}:\n{df.head()}")
                 return df
             except Exception as e:
-                print(f"Attempt {attempt + 1} failed for series_id {series_id}: {e}")
+                print(f"Attempt {attempt + 1} failed: {e}")
                 if attempt < retry_count - 1:
                     print(f"Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
@@ -44,12 +59,12 @@ class FredFetcher:
                     raise
 
     def transform_to_ohlcv(self, df):
-        print(f"Initial DataFrame:\n{df.head()}")
+        print(f"Transforming data to OHLCV:\n{df.head()}")
         df = df.copy()
         if self.missing_data_handling == "interpolate":
             df = df.interpolate(method="linear", axis=0)
         elif self.missing_data_handling == "flag":
-            pass  # Retain missing values as-is
+            pass  # Retain missing values
         elif self.missing_data_handling == "forward_fill":
             df = df.ffill(axis=0)
         else:
@@ -57,24 +72,19 @@ class FredFetcher:
                 f"Unsupported missing_data_handling: {self.missing_data_handling}"
             )
 
-        print(
-            f"DataFrame after missing data handling ({self.missing_data_handling}):\n{df.head()}"
-        )
-
-        # Ensure the index has no frequency
-        if hasattr(df.index, "freq") and df.index.freq is not None:
-            df.index = pd.DatetimeIndex(df.index.values)
-
         ohlcv = pd.DataFrame(
             {
                 "Open": df["Value"],
                 "High": df["Value"],
                 "Low": df["Value"],
                 "Close": df["Value"],
-                "Volume": [0] * len(df),  # Placeholder volume
+                "Volume": [0] * len(df),
             },
             index=df.index,
         )
-
-        print(f"Transformed OHLCV DataFrame:\n{ohlcv.head()}")
+        print(f"OHLCV data:\n{ohlcv.head()}")
         return ohlcv
+
+    def save_to_csv(self, ohlcv, file_path):
+        print(f"Saving OHLCV data to {file_path}")
+        ohlcv.to_csv(file_path)

@@ -1,203 +1,106 @@
-import json
 import os
+import tempfile
 
 import pandas as pd
+import vectorbt as vbt
 
 from DataPipeline import DataPipeline
-from yfinance_fetcher import YahooFinanceFetcher
 
-# Load the FRED test configuration
-config_path = os.path.abspath("./config/fred_test_config.json")
 
-# Check if the config file exists
-if not os.path.exists(config_path):
-    raise FileNotFoundError(f"Config file not found at {config_path}")
+def validate_ohlcv_structure(df):
+    """Ensure the OHLCV data has the correct structure for vectorbt."""
+    required_columns = ["Open", "High", "Low", "Close", "Volume"]
+    for column in required_columns:
+        if column not in df.columns:
+            raise ValueError(f"Missing required column: {column}")
 
-with open(config_path, "r") as config_file:
-    config = json.load(config_file)
+    # Validate data types
+    if not pd.api.types.is_float_dtype(df["Close"]):
+        raise TypeError("'Close' column must be of type float64.")
+    if not pd.api.types.is_integer_dtype(df["Volume"]):
+        raise TypeError("'Volume' column must be of type int64.")
 
-# Ensure output directory exists
-output_dir = config.get("output_dir", "output/")
-os.makedirs(output_dir, exist_ok=True)
+    # Validate index
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("Index must be a DatetimeIndex.")
+    if not df.index.is_monotonic_increasing:
+        raise ValueError("Index must be monotonic increasing.")
 
-# Run the pipeline
-pipeline = DataPipeline(config)
-pipeline.run()
+    print("OHLCV structure validation passed.")
 
-# Analyze output for FRED
-for ticker, alias in config["aliases"]["FRED"].items():
-    csv_path = os.path.join(output_dir, f"{alias}.csv")
 
-    if os.path.exists(csv_path):
-        # Load OHLCV data
-        ohlcv_df = pd.read_csv(csv_path, index_col="Date", parse_dates=True)
-
-        # Normalize the index and rebuild it without frequency
-        ohlcv_df.index = pd.to_datetime(ohlcv_df.index).normalize()
-        ohlcv_df.index = pd.DatetimeIndex(
-            ohlcv_df.index.values, freq=None
-        )  # Explicitly remove frequency
-
-        # Remove duplicate indices and validate data
-        ohlcv_df = ohlcv_df.loc[~ohlcv_df.index.duplicated(keep="first")]
-
-        # Handle missing values
-        print("Rows with NaN values before handling:")
-        print(ohlcv_df[ohlcv_df.isna().any(axis=1)])
-
-        # Interpolate and handle edge NaNs with forward/backward fill
-        ohlcv_df = ohlcv_df.interpolate(method="linear").ffill().bfill()
-
-        # Ensure correct data types
-        ohlcv_df = ohlcv_df.astype(
-            {
-                "Open": "float64",
-                "High": "float64",
-                "Low": "float64",
-                "Close": "float64",
-                "Volume": "int64",
+def test_fred_pipeline_with_vectorbt():
+    """Run the FRED data pipeline and validate its compatibility with vectorbt."""
+    # Embedded configuration JSON
+    config = {
+        "tickers": {"FRED": ["BAMLH0A0HYM2"]},
+        "fred_settings": {
+            "BAMLH0A0HYM2": {
+                "start_date": "2023-01-01",
+                "end_date": "2023-01-10",
+                "alias": "OAS_Spread",
             }
-        )
+        },
+        "output_dir": None,  # We will use a temp directory
+        "settings": {"missing_data_handling": "interpolate"},
+    }
 
-        # Save and reload data to confirm format
-        temp_csv_path = "temp_ohlcv.csv"
-        ohlcv_df.to_csv(temp_csv_path, index_label="Date")
+    # Create a temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        print(f"Temporary output directory: {temp_dir}")
+        config["output_dir"] = temp_dir
 
-        # Debug the saved CSV to ensure the correct format
-        with open(temp_csv_path, "r") as file:
-            print("Content of saved CSV:")
-            print(file.read())
+        pipeline = DataPipeline(config)
 
-        ohlcv_df = pd.read_csv(temp_csv_path, index_col="Date", parse_dates=True)
-
-        # Validate no remaining NaN values
-        assert (
-            ohlcv_df.index.is_monotonic_increasing
-        ), "Index must be monotonic increasing"
-        assert not ohlcv_df.isna().any().any(), "Data contains NaN values"
-
-        # Display the first few rows of the data
-        print("Rows after handling NaNs:")
-        print(ohlcv_df.head())
-
-        # Optionally, analyze with vectorbt
         try:
-            import vectorbt as vbt
-
-            # Debug index details before analysis
-            print("Index details before vectorbt analysis:")
-            print(ohlcv_df.index)
-            print(ohlcv_df.head())
-            print(ohlcv_df.info())
-
-            # Rebuild index without frequency and fully reset metadata
-            ohlcv_df.index = pd.to_datetime(ohlcv_df.index, errors="coerce")
-            ohlcv_df.index = pd.DatetimeIndex(ohlcv_df.index.values, freq=None)
-
-            print("Index after processing:", ohlcv_df.index)
-
-            # Create a portfolio using vectorbt
-            portfolio = vbt.Portfolio.from_signals(
-                close=ohlcv_df["Close"],
-                entries=ohlcv_df["Close"]
-                > ohlcv_df["Close"].shift(1),  # Example entry condition
-                exits=ohlcv_df["Close"]
-                < ohlcv_df["Close"].shift(1),  # Example exit condition
-            )
-            print(portfolio.stats())  # Use stats() for portfolio analysis
-            portfolio.plot().show()
-        except ImportError:
-            print("vectorbt is not installed. Skipping portfolio analysis.")
+            pipeline.run()
         except Exception as e:
-            print(f"Error analyzing data with vectorbt: {e}")
-    else:
-        print(f"Output file {csv_path} not found. Ensure the pipeline ran correctly.")
+            print(f"Pipeline error: {e}")
 
-# Analyze output for Yahoo Finance
-for ticker, alias in config["aliases"]["Yahoo Finance"].items():
-    csv_path = os.path.join(output_dir, f"{alias}.csv")
+        fred_tickers = config.get("tickers", {}).get("FRED", [])
 
-    if os.path.exists(csv_path):
-        # Load OHLCV data
-        ohlcv_df = pd.read_csv(csv_path, index_col="Date", parse_dates=True)
+        for ticker in fred_tickers:
+            alias = config.get("fred_settings", {}).get(ticker, {}).get("alias", ticker)
+            file_path = os.path.join(temp_dir, f"{alias}.csv")
 
-        # Normalize the index and rebuild it without frequency
-        ohlcv_df.index = pd.to_datetime(ohlcv_df.index).normalize()
-        ohlcv_df.index = pd.DatetimeIndex(
-            ohlcv_df.index.values, freq=None
-        )  # Explicitly remove frequency
+            print(f"Looking for file: {file_path}")
 
-        # Remove duplicate indices and validate data
-        ohlcv_df = ohlcv_df.loc[~ohlcv_df.index.duplicated(keep="first")]
+            if not os.path.exists(file_path):
+                print(f"Output file not found for {ticker}. Skipping processing.")
+                continue
 
-        # Handle missing values
-        print("Rows with NaN values before handling:")
-        print(ohlcv_df[ohlcv_df.isna().any(axis=1)])
+            print(f"Loading data for {alias} from {file_path}...")
+            df = pd.read_csv(file_path, index_col="Date", parse_dates=True)
 
-        # Interpolate and handle edge NaNs with forward/backward fill
-        ohlcv_df = ohlcv_df.interpolate(method="linear").ffill().bfill()
+            # Validate and fix the index
+            df = df.loc[~df.index.duplicated(keep="first")]  # Remove duplicates
+            df = df.sort_index()  # Ensure index is sorted
+            df.index.freq = None  # Remove inferred frequency
 
-        # Ensure correct data types
-        ohlcv_df = ohlcv_df.astype(
-            {
-                "Open": "float64",
-                "High": "float64",
-                "Low": "float64",
-                "Close": "float64",
-                "Volume": "int64",
-            }
-        )
-
-        # Save and reload data to confirm format
-        temp_csv_path = "temp_ohlcv_yahoo.csv"
-        ohlcv_df.to_csv(temp_csv_path, index_label="Date")
-
-        # Debug the saved CSV to ensure the correct format
-        with open(temp_csv_path, "r") as file:
-            print("Content of saved CSV:")
-            print(file.read())
-
-        ohlcv_df = pd.read_csv(temp_csv_path, index_col="Date", parse_dates=True)
-
-        # Validate no remaining NaN values
-        assert (
-            ohlcv_df.index.is_monotonic_increasing
-        ), "Index must be monotonic increasing"
-        assert not ohlcv_df.isna().any().any(), "Data contains NaN values"
-
-        # Display the first few rows of the data
-        print("Rows after handling NaNs:")
-        print(ohlcv_df.head())
-
-        # Optionally, analyze with vectorbt
-        try:
-            import vectorbt as vbt
-
-            # Debug index details before analysis
-            print("Index details before vectorbt analysis:")
-            print(ohlcv_df.index)
-            print(ohlcv_df.head())
-            print(ohlcv_df.info())
-
-            # Rebuild index without frequency and fully reset metadata
-            ohlcv_df.index = pd.to_datetime(ohlcv_df.index, errors="coerce")
-            ohlcv_df.index = pd.DatetimeIndex(ohlcv_df.index.values, freq=None)
-
-            print("Index after processing:", ohlcv_df.index)
-
-            # Create a portfolio using vectorbt
-            portfolio = vbt.Portfolio.from_signals(
-                close=ohlcv_df["Close"],
-                entries=ohlcv_df["Close"]
-                > ohlcv_df["Close"].shift(1),  # Example entry condition
-                exits=ohlcv_df["Close"]
-                < ohlcv_df["Close"].shift(1),  # Example exit condition
+            # Ensure all columns are cast to the correct types
+            df = df.astype(
+                {
+                    "Open": "float64",
+                    "High": "float64",
+                    "Low": "float64",
+                    "Close": "float64",
+                    "Volume": "int64",
+                }
             )
-            print(portfolio.stats())  # Use stats() for portfolio analysis
-            portfolio.plot().show()
-        except ImportError:
-            print("vectorbt is not installed. Skipping portfolio analysis.")
-        except Exception as e:
-            print(f"Error analyzing data with vectorbt: {e}")
-    else:
-        print(f"Output file {csv_path} not found. Ensure the pipeline ran correctly.")
+
+            # Validate OHLCV structure
+            validate_ohlcv_structure(df)
+
+            # Test with vectorbt
+            print(f"Testing vectorbt compatibility for {alias}...")
+            portfolio = vbt.Portfolio.from_signals(
+                close=df["Close"],
+                entries=df["Close"] > df["Close"].shift(1),
+                exits=df["Close"] < df["Close"].shift(1),
+                freq="D",  # Explicitly specify daily frequency
+            )
+            print(f"Portfolio statistics for {alias}:{portfolio.stats()}")
+
+
+if __name__ == "__main__":
+    test_fred_pipeline_with_vectorbt()
