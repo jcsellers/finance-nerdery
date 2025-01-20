@@ -1,5 +1,4 @@
 import os
-from unittest.mock import Mock
 
 import pandas as pd
 import pytest
@@ -8,12 +7,7 @@ from DataPipeline import DataPipeline
 
 
 @pytest.fixture
-def temp_output_dir(tmp_path):
-    return tmp_path
-
-
-@pytest.fixture
-def synthetic_test_config(temp_output_dir):
+def synthetic_test_config(tmp_path):
     return {
         "tickers": {"Synthetic": ["TEST1", "TEST2"]},
         "synthetic_settings": {
@@ -31,7 +25,8 @@ def synthetic_test_config(temp_output_dir):
                 "start_value": 50,
             },
         },
-        "output_dir": str(temp_output_dir),
+        "output_dir": str(tmp_path),
+        "settings": {"missing_data_handling": "interpolate"},
     }
 
 
@@ -41,10 +36,10 @@ def test_synthetic_pipeline_execution(synthetic_test_config):
 
     output_dir = synthetic_test_config["output_dir"]
     expected_files = ["TEST1.csv", "TEST2.csv"]
+
     for file_name in expected_files:
-        assert os.path.exists(
-            os.path.join(output_dir, file_name)
-        ), f"{file_name} not found in output directory."
+        file_path = os.path.join(output_dir, file_name)
+        assert os.path.exists(file_path), f"{file_name} not found in output directory."
 
 
 def test_synthetic_csv_content(synthetic_test_config):
@@ -56,9 +51,11 @@ def test_synthetic_csv_content(synthetic_test_config):
         file_path = os.path.join(output_dir, f"{ticker}.csv")
         df = pd.read_csv(file_path, index_col="Date", parse_dates=True)
 
+        # Validate schema
         expected_columns = ["Open", "High", "Low", "Close", "Volume"]
         assert list(df.columns) == expected_columns, f"{ticker} CSV schema mismatch."
 
+        # Validate content
         if settings["data_type"] == "linear":
             expected_values = [
                 settings["start_value"] + i * settings["growth_rate"]
@@ -73,6 +70,7 @@ def test_synthetic_csv_content(synthetic_test_config):
                 df["Open"].values == expected_values
             ).all(), f"{ticker} Open column mismatch for cash data."
 
+        # Validate consistency in OHLCV columns
         assert (df["High"] == df["Open"]).all(), f"{ticker} High column mismatch."
         assert (df["Low"] == df["Open"]).all(), f"{ticker} Low column mismatch."
         assert (df["Close"] == df["Open"]).all(), f"{ticker} Close column mismatch."

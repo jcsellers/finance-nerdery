@@ -44,12 +44,6 @@ class FredFetcher:
                     raise
 
     def transform_to_ohlcv(self, df):
-        """
-        Transform FRED data into OHLCV format.
-
-        :param df: Input DataFrame with a single "Value" column.
-        :return: DataFrame in OHLCV format.
-        """
         print(f"Initial DataFrame:\n{df.head()}")
         df = df.copy()
         if self.missing_data_handling == "interpolate":
@@ -66,6 +60,10 @@ class FredFetcher:
         print(
             f"DataFrame after missing data handling ({self.missing_data_handling}):\n{df.head()}"
         )
+
+        # Ensure the index has no frequency
+        if hasattr(df.index, "freq") and df.index.freq is not None:
+            df.index = pd.DatetimeIndex(df.index.values)
 
         ohlcv = pd.DataFrame(
             {

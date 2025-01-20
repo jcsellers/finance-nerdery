@@ -14,7 +14,7 @@ isort>=5.12
 python-dotenv>=1.0
 pytest-mock>=3.10
 vectorbt>=0.2.4
-pandas-market-calendar
+pandas-market-calendars
 pandas-datareader
 pytest-mock>=3.10
 coverage>=7.2

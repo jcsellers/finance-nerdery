@@ -1,32 +1,33 @@
 {
     "tickers": {
-        "Yahoo Finance": [
-            "SPY",
-            "SSO",
-            "UPRO",
-            "GLD",
-            "TLT",
-            "^SPX",
-            "^VIX"
-        ],
         "FRED": [
             "BAMLH0A0HYM2",
             "DGS10"
+        ],
+        "Yahoo Finance": [
+            "UPRO",
+            "SSO",
+            "SPY",
+            "TLT",
+            "GLD"
         ]
     },
     "aliases": {
         "FRED": {
             "BAMLH0A0HYM2": "OAS Spread",
             "DGS10": "10 Year Treasury Yield"
+        },
+        "Yahoo Finance": {
+            "UPRO": "3x SP500 ETF",
+            "SSO": "2x SP500 ETF",
+            "SPY": "SPY",
+            "TLT": "20 Year Treasury ETF",
+            "GLD": "Gold ETF"
         }
     },
     "date_ranges": {
         "start_date": "2020-01-02",
         "end_date": "current"
-    },
-    "storage": {
-        "CSV": "output/",
-        "log_dir": "logs/"
     },
     "output_dir": "output/",
     "settings": {
@@ -34,17 +35,5 @@
         "log_level": "verbose",
         "timezone": "UTC",
         "missing_data_handling": "interpolate"
-    },
-    "FRED": {
-        "api_key_env_var": "FRED_API_KEY"
-    },
-    "synthetic_data": {
-        "cash": {
-            "start_value": 1.0
-        },
-        "linear": {
-            "start_value": 1.0,
-            "growth_rate": 0.01
-        }
     }
 }

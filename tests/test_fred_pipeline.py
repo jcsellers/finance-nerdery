@@ -4,11 +4,11 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from DataPipeline import DataPipeline
+from fred_data_fetcher import FredFetcher
 
 
 @pytest.fixture
-def pipeline_test_config(tmp_path):
+def fred_test_config(tmp_path):
     return {
         "tickers": {"FRED": ["BAMLH0A0HYM2"]},
         "fred_settings": {
@@ -19,43 +19,52 @@ def pipeline_test_config(tmp_path):
             }
         },
         "output_dir": str(tmp_path),
+        "settings": {"missing_data_handling": "interpolate"},
     }
 
 
-def inspect_csv(file_path):
-    """Inspect a CSV file for schema and data quality."""
-    df = pd.read_csv(file_path, index_col="Date", parse_dates=True)
+def test_fetch_data_with_cache(mocker, fred_test_config):
+    # Mock FRED API response
+    mock_fred = MagicMock()
+    mock_fred.get_series.return_value = pd.Series(
+        [1.5, 2.0, 2.5],
+        index=pd.to_datetime(["2023-01-03", "2023-01-04", "2023-01-05"]),
+    )
+    mocker.patch("fred_data_fetcher.Fred", return_value=mock_fred)
 
-    # Validate schema
+    fetcher = FredFetcher(api_key="test_key", cache_dir=fred_test_config["output_dir"])
+    settings = fred_test_config["fred_settings"]["BAMLH0A0HYM2"]
+    df = fetcher.fetch_data(
+        "BAMLH0A0HYM2", settings["start_date"], settings["end_date"]
+    )
+
+    # Validate fetched data
+    assert not df.empty, "Fetched data should not be empty."
+    assert "Value" in df.columns, "Fetched data missing 'Value' column."
+
+
+def test_transform_to_ohlcv(fred_test_config):
+    # Sample FRED data
+    df = pd.DataFrame(
+        {
+            "Date": pd.to_datetime(["2023-01-03", "2023-01-04", "2023-01-05"]),
+            "Value": [1.5, 2.0, 2.5],
+        }
+    )
+    df.set_index("Date", inplace=True)
+
+    fetcher = FredFetcher(api_key="test_key", missing_data_handling="interpolate")
+    ohlcv_df = fetcher.transform_to_ohlcv(df)
+
+    # Validate OHLCV schema
     expected_columns = ["Open", "High", "Low", "Close", "Volume"]
-    assert list(df.columns) == expected_columns, f"Schema mismatch in {file_path}."
-
-    # Check for missing values
-    missing_values = df.isna().sum().sum()
-    assert missing_values == 0, f"{file_path} contains missing values."
-
-    # Basic data properties
-    assert len(df) > 0, f"{file_path} is empty."
-    print(f"{file_path} passed inspection with {len(df)} rows.")
+    assert list(ohlcv_df.columns) == expected_columns, "OHLCV schema mismatch."
+    assert (ohlcv_df["Open"] == df["Value"]).all(), "Open values mismatch."
+    assert (ohlcv_df["Close"] == df["Value"]).all(), "Close values mismatch."
 
 
-def test_pipeline_fred_integration_with_inspection(pipeline_test_config):
-    pipeline = DataPipeline(pipeline_test_config)
-    pipeline.run()
-
-    output_dir = pipeline_test_config["output_dir"]
-    alias = "OAS Spread"
-    file_path = os.path.join(output_dir, f"{alias}.csv")
-
-    # Validate file existence
-    assert os.path.exists(file_path), f"Output file {file_path} not found."
-
-    # Inspect the file
-    inspect_csv(file_path)
-
-
-def test_fred_pipeline_missing_data_handling(mocker, pipeline_test_config):
-    # Mock FRED API
+def test_missing_data_handling(mocker, fred_test_config):
+    # Mock FRED API response with missing data
     mock_fred = MagicMock()
     mock_fred.get_series.return_value = pd.Series(
         [1.5, None, 2.5],
@@ -63,25 +72,25 @@ def test_fred_pipeline_missing_data_handling(mocker, pipeline_test_config):
     )
     mocker.patch("fred_data_fetcher.Fred", return_value=mock_fred)
 
-    # Test interpolation
-    pipeline_test_config["missing_data_handling"] = "interpolate"
-    pipeline = DataPipeline(pipeline_test_config)
-    pipeline.run()
-    output_dir = pipeline_test_config["output_dir"]
-    file_path = os.path.join(output_dir, "OAS Spread.csv")
-    df = pd.read_csv(file_path, index_col="Date", parse_dates=True)
-    assert df.isna().sum().sum() == 0, "Interpolation failed to handle missing data."
+    # Test interpolate
+    fetcher = FredFetcher(api_key="test_key", missing_data_handling="interpolate")
+    settings = fred_test_config["fred_settings"]["BAMLH0A0HYM2"]
+    df = fetcher.fetch_data(
+        "BAMLH0A0HYM2", settings["start_date"], settings["end_date"]
+    )
+    ohlcv_df = fetcher.transform_to_ohlcv(df)
+    assert (
+        ohlcv_df.isna().sum().sum() == 0
+    ), "Interpolation failed to handle missing values."
 
     # Test forward fill
-    pipeline_test_config["missing_data_handling"] = "forward_fill"
-    pipeline = DataPipeline(pipeline_test_config)
-    pipeline.run()
-    df = pd.read_csv(file_path, index_col="Date", parse_dates=True)
-    assert df.isna().sum().sum() == 0, "Forward fill failed to handle missing data."
+    fetcher.missing_data_handling = "forward_fill"
+    ohlcv_df = fetcher.transform_to_ohlcv(df)
+    assert (
+        ohlcv_df.isna().sum().sum() == 0
+    ), "Forward fill failed to handle missing values."
 
     # Test flagging
-    pipeline_test_config["missing_data_handling"] = "flag"
-    pipeline = DataPipeline(pipeline_test_config)
-    pipeline.run()
-    df = pd.read_csv(file_path, index_col="Date", parse_dates=True)
-    assert df.isna().sum().sum() > 0, "Flagging did not retain missing values."
+    fetcher.missing_data_handling = "flag"
+    ohlcv_df = fetcher.transform_to_ohlcv(df)
+    assert ohlcv_df.isna().sum().sum() > 0, "Flagging did not retain missing values."
