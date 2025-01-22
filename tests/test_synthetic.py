@@ -4,6 +4,8 @@ import pandas as pd
 import pytest
 
 from DataPipeline import DataPipeline
+from synthetic_data_generator import SyntheticDataGenerator
+from synthetic_pipeline import SyntheticPipeline
 
 
 @pytest.fixture
