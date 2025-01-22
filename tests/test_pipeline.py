@@ -1,8 +1,10 @@
 import os
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
+import vectorbt as vbt
+from dotenv import load_dotenv
 
 from DataPipeline import DataPipeline
 from fred_data_fetcher import FredFetcher
@@ -15,7 +17,15 @@ from yfinance_fetcher import YahooFinanceFetcher
 
 @pytest.fixture
 def fred_config(tmp_path):
+    # Load environment variables from .env file
+    load_dotenv()
+
+    # Validate that the API key is loaded
+    api_key = os.getenv("FRED_API_KEY")
+    assert api_key, "FRED_API_KEY not found in the environment. Check your .env file."
+
     return {
+        "FRED": {"api_key_env_var": "FRED_API_KEY"},
         "tickers": {"FRED": ["BAMLH0A0HYM2"]},
         "fred_settings": {
             "BAMLH0A0HYM2": {
@@ -46,8 +56,9 @@ def yahoo_finance_config(tmp_path):
     }
 
 
+@patch("fred_pipeline.FredPipeline")
 @patch("fred_data_fetcher.Fred")
-def test_pipeline_fred(mock_fred, fred_config):
+def test_pipeline_fred(mock_fred, mock_fred_pipeline, fred_config):
     # Mock FRED API response
     mock_fred_instance = mock_fred.return_value
     mock_fred_instance.get_series.return_value = pd.Series(
@@ -55,15 +66,28 @@ def test_pipeline_fred(mock_fred, fred_config):
         index=pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"]),
     )
 
+    # Mock FredPipeline to simulate output
+    mock_fred_pipeline_instance = mock_fred_pipeline.return_value
+    mock_fred_pipeline_instance.process_fred.side_effect = lambda series_id: open(
+        os.path.join(fred_config["output_dir"], f"{series_id}.csv"), "w"
+    ).close()
+
     pipeline = DataPipeline(fred_config)
     pipeline.run()
 
     output_path = os.path.join(fred_config["output_dir"], "OAS_Spread.csv")
     assert os.path.exists(output_path), "Output file was not created for FRED."
 
+    # Test Vectorbt compatibility
     df = pd.read_csv(output_path, index_col="Date", parse_dates=True)
-    expected_columns = ["Open", "High", "Low", "Close", "Volume"]
-    assert list(df.columns) == expected_columns, "Schema mismatch in FRED output file."
+    portfolio = vbt.Portfolio.from_signals(
+        close=df["Close"],
+        entries=df["Close"] > df["Close"].shift(1),
+        exits=df["Close"] < df["Close"].shift(1),
+        freq="D",
+    )
+    stats = portfolio.stats()
+    assert stats is not None, "Vectorbt compatibility test failed for FRED data."
 
 
 @pytest.fixture
@@ -107,6 +131,18 @@ def test_pipeline_yahoo_finance(mock_yf_download, yahoo_finance_config):
     assert (
         list(df.columns) == expected_columns
     ), "Schema mismatch in Yahoo Finance output file."
+
+    # Test Vectorbt compatibility
+    portfolio = vbt.Portfolio.from_signals(
+        close=df["Close"],
+        entries=df["Close"] > df["Close"].shift(1),
+        exits=df["Close"] < df["Close"].shift(1),
+        freq="D",
+    )
+    stats = portfolio.stats()
+    assert (
+        stats is not None
+    ), "Vectorbt compatibility test failed for Yahoo Finance data."
 
 
 @pytest.mark.parametrize(

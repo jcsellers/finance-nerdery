@@ -6,21 +6,10 @@ from synthetic_data_generator import SyntheticDataGenerator
 
 class SyntheticPipeline:
     def __init__(self, output_dir, synthetic_settings):
-        """
-        Initialize the SyntheticPipeline.
-
-        :param output_dir: Directory where output files will be saved.
-        :param synthetic_settings: Dictionary of synthetic-specific settings.
-        """
         self.output_dir = output_dir
         self.synthetic_settings = synthetic_settings
 
     def process_synthetic(self, ticker):
-        """
-        Process synthetic data for a given ticker.
-
-        :param ticker: Synthetic data ticker symbol.
-        """
         logger = logging.getLogger(__name__)
         logger.debug(f"Entering process_synthetic for ticker: {ticker}")
 
@@ -41,8 +30,6 @@ class SyntheticPipeline:
             f"Generating synthetic data for {ticker} from {start_date} to {end_date}."
         )
         try:
-            from synthetic_data_generator import SyntheticDataGenerator
-
             generator = SyntheticDataGenerator(
                 start_date=start_date,
                 end_date=end_date,
@@ -52,6 +39,11 @@ class SyntheticPipeline:
                 growth_rate=growth_rate,
             )
             df = generator.generate()
+
+            assert len(df) > 0, f"Generated DataFrame for {ticker} is empty."
+            assert (
+                df.index.is_monotonic_increasing
+            ), f"Index for {ticker} is not sorted."
 
             output_path = os.path.join(self.output_dir, f"{ticker}.csv")
             logger.info(f"Saving synthetic data for {ticker} to {output_path}.")
