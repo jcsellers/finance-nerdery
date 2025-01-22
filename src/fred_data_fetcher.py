@@ -4,21 +4,9 @@ import time
 
 import pandas as pd
 from fredapi import Fred
-
-# Ensure the logs directory exists
-log_dir = os.path.join(os.path.dirname(__file__), "../logs")
-os.makedirs(log_dir, exist_ok=True)
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Configure logging
-log_file_path = os.path.join(log_dir, "fred_fetcher.log")
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(log_file_path, mode="w"),  # Log to the logs directory
-    ],
-)
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +17,7 @@ class FredFetcher:
 
         :param api_key: API key for FRED API.
         :param cache_dir: Directory to store cached data.
-        :param missing_data_handling: Strategy for handling missing data ('interpolate', 'flag', or 'forward_fill').
+        :param missing_data_handling: Strategy for handling missing data ('interpolate', 'forward_fill', or 'flag').
         """
         logger.info("Initializing FredFetcher...")
         self.api_key = api_key
@@ -39,65 +27,70 @@ class FredFetcher:
         os.makedirs(self.cache_dir, exist_ok=True)
         logger.info("FredFetcher initialized successfully.")
 
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
     def fetch_data(self, series_id, start_date, end_date):
-        logger.debug(
-            f"Entering fetch_data for series_id={series_id}, start_date={start_date}, end_date={end_date}"
-        )
-        retry_count = 3
-        retry_delay = 5
+        """
+        Fetch data from FRED API and return as a DataFrame.
 
+        :param series_id: FRED series ID.
+        :param start_date: Start date for the data fetch.
+        :param end_date: End date for the data fetch.
+        :return: DataFrame with Date as index and Value column.
+        """
+        logger.info(
+            f"Fetching data for series ID {series_id} from {start_date} to {end_date}..."
+        )
         cache_file = os.path.join(
             self.cache_dir, f"{series_id}_{start_date}_{end_date}.csv"
         )
+
         if os.path.exists(cache_file):
-            logger.info(f"Loading cached data for {series_id} from {cache_file}")
+            logger.info(
+                f"Loading cached data for series ID {series_id} from {cache_file}"
+            )
             return pd.read_csv(cache_file, index_col="Date", parse_dates=True)
 
-        for attempt in range(retry_count):
-            try:
-                logger.info(
-                    f"Fetching data for series_id: {series_id} (Attempt {attempt + 1})"
-                )
-                series = self.fred.get_series(
-                    series_id, observation_start=start_date, observation_end=end_date
-                )
+        try:
+            series = self.fred.get_series(
+                series_id, observation_start=start_date, observation_end=end_date
+            )
+            if series.empty:
+                logger.warning(f"No data returned for series ID {series_id}.")
+                return pd.DataFrame(columns=["Date", "Value"]).set_index("Date")
 
-                if series is None or series.empty:
-                    logger.error(f"No data returned for series_id: {series_id}")
-                    raise ValueError(
-                        f"No data found for series_id: {series_id} in the given date range."
-                    )
+            df = series.reset_index()
+            df.columns = ["Date", "Value"]
+            df.set_index("Date", inplace=True)
 
-                df = series.reset_index()
-                df.columns = ["Date", "Value"]
-                df.set_index("Date", inplace=True)
+            logger.info(f"Caching data for series ID {series_id} to {cache_file}")
+            df.to_csv(cache_file)
 
-                # Cache the data
-                logger.info(f"Caching data to {cache_file}")
-                df.to_csv(cache_file)
-
-                logger.debug(f"Fetched data for {series_id}:\n{df.head()}")
-                return df
-            except Exception as e:
-                logger.error(f"Attempt {attempt + 1} failed: {e}", exc_info=True)
-                if attempt < retry_count - 1:
-                    logger.info(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                else:
-                    logger.error("Max retries reached. Raising the error.")
-                    raise
+            logger.info(f"Fetched data for series ID {series_id} with {len(df)} rows.")
+            return df
+        except Exception as e:
+            logger.error(
+                f"Error fetching data for series ID {series_id}: {e}", exc_info=True
+            )
+            raise RuntimeError(f"Error fetching data for series ID {series_id}: {e}")
 
     def transform_to_ohlcv(self, df):
-        logger.info("Starting data transformation to OHLCV format...")
+        """
+        Transform FRED data to OHLCV format.
+
+        :param df: Input DataFrame with Date index and Value column.
+        :return: DataFrame in OHLCV format.
+        """
+        logger.info("Transforming data to OHLCV format...")
         logger.debug(f"Initial data:\n{df.head()}")
 
-        df = df.copy()
         if self.missing_data_handling == "interpolate":
-            df = df.interpolate(method="linear", axis=0)
+            df = df.interpolate()
+        elif self.missing_data_handling == "forward_fill":
+            df = df.ffill()
         elif self.missing_data_handling == "flag":
             pass  # Retain missing values
-        elif self.missing_data_handling == "forward_fill":
-            df = df.ffill(axis=0)
         else:
             raise ValueError(
                 f"Unsupported missing_data_handling: {self.missing_data_handling}"
@@ -118,31 +111,22 @@ class FredFetcher:
             index=df.index,
         )
 
-        logger.debug(f"Transformed OHLCV data:\n{ohlcv.head()}")
-        logger.info("Data transformation to OHLCV format completed.")
+        logger.info(f"Transformed data to OHLCV format with {len(ohlcv)} rows.")
+        logger.debug(f"OHLCV data:\n{ohlcv.head()}")
         return ohlcv
 
     def save_to_csv(self, ohlcv, file_path):
+        """
+        Save OHLCV data to a CSV file.
+
+        :param ohlcv: DataFrame in OHLCV format.
+        :param file_path: Path to save the CSV file.
+        """
         try:
             logger.info(f"Saving OHLCV data to {file_path}...")
             ohlcv.to_csv(file_path, index_label="Date")
-            logger.info(f"Successfully saved OHLCV data to {file_path}")
+            logger.info(f"Successfully saved OHLCV data to {file_path}.")
         except Exception as e:
             logger.error(
                 f"Failed to save OHLCV data to {file_path}: {e}", exc_info=True
             )
-
-
-if __name__ == "__main__":
-    # Standalone test for FredFetcher
-    api_key = os.getenv("FRED_API_KEY")
-    if not api_key:
-        logger.error("FRED_API_KEY is not set in the environment. Exiting.")
-    else:
-        try:
-            fetcher = FredFetcher(api_key)
-            logger.info("Testing FRED fetch for series_id='BAMLH0A0HYM2'")
-            df = fetcher.fetch_data("BAMLH0A0HYM2", "2023-01-01", "2023-01-10")
-            logger.info(f"Fetched data:\n{df.head()}")
-        except Exception as e:
-            logger.error(f"Standalone test failed: {e}", exc_info=True)
