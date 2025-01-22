@@ -1,0 +1,7 @@
+{
+    "strategy_name": "buy_and_hold",
+    "parameters": {
+        "target_asset": "SPY",
+        "order_size": 100
+    }
+}
