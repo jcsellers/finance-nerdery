@@ -13,12 +13,13 @@ from yfinance_fetcher import YahooFinanceFetcher
 def yahoo_finance_config(tmp_path):
     return {
         "tickers": {"Yahoo Finance": ["AAPL"]},
-        "aliases": {"Yahoo Finance": {"AAPL": "Apple"}},
-        "yahoo_finance_settings": {
-            "AAPL": {
-                "start_date": "2023-01-01",
-                "end_date": "2023-01-10",
-                "alias": "Apple",
+        "aliases": {
+            "Yahoo Finance": {
+                "AAPL": {
+                    "start_date": "2023-01-01",
+                    "end_date": "2023-01-10",
+                    "alias": "Apple",
+                }
             }
         },
         "settings": {"missing_data_handling": "interpolate"},
