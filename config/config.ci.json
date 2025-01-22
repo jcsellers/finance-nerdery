@@ -1,0 +1,36 @@
+{
+    "tickers": {
+        "FRED": [
+            "BAMLH0A0HYM2"
+        ],
+        "Yahoo Finance": [
+            "AAPL"
+        ]
+    },
+    "aliases": {
+        "FRED": {
+            "BAMLH0A0HYM2": "OAS Spread"
+        },
+        "Yahoo Finance": {
+            "AAPL": {
+                "start_date": "2023-01-01",
+                "end_date": "2023-01-03",
+                "alias": "Apple"
+            }
+        }
+    },
+    "FRED": {
+        "api_key_env_var": "FRED_API_KEY"
+    },
+    "date_ranges": {
+        "start_date": "2023-01-01",
+        "end_date": "2023-01-03"
+    },
+    "output_dir": "output_ci/",
+    "settings": {
+        "retry_count": 1,
+        "log_level": "debug",
+        "timezone": "UTC",
+        "missing_data_handling": "interpolate"
+    }
+}

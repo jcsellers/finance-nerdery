@@ -6,3 +6,7 @@ include_trailing_comma = true   # Ensure trailing commas for multiline imports
 force_grid_wrap = 0             # Avoid unnecessary wrapping of imports
 combine_as_imports = true       # Combine `import ... as ...` statements
 balanced_wrapping = true        # Attempt to balance wrapping for readability
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

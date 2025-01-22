@@ -1,0 +1,30 @@
+{
+    "tickers": {
+        "FRED": [
+            "BAMLH0A0HYM2",
+            "DGS10"
+        ]
+    },
+    "aliases": {
+        "FRED": {
+            "BAMLH0A0HYM2": "OAS Spread",
+            "DGS10": "10 Year Treasury Yield"
+        }
+    },
+    "fred_settings": {
+        "BAMLH0A0HYM2": {
+            "start_date": "2023-01-01",
+            "end_date": "2023-01-10",
+            "alias": "OAS Spread"
+        },
+        "DGS10": {
+            "start_date": "2023-01-01",
+            "end_date": "2023-01-10",
+            "alias": "10 Year Treasury Yield"
+        }
+    },
+    "output_dir": "output/",
+    "settings": {
+        "missing_data_handling": "interpolate"
+    }
+}
