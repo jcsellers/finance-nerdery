@@ -1,7 +1,7 @@
 {
     "strategy_name": "buy_and_hold",
     "parameters": {
-        "target_asset": "('spy', 'close')_301.1949157714844",
+        "target_asset": ["spy", "close"],
         "order_size": 100
     }
 }

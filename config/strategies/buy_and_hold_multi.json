@@ -1,0 +1,15 @@
+{
+    "strategy_name": "Buy and Hold Multi",
+    "tickers": ["UPRO", "SSO", "SPY", "TLT", "GLD"],
+    "allocation": {
+      "UPRO": 0.2,
+      "SSO": 0.2,
+      "SPY": 0.2,
+      "TLT": 0.2,
+      "GLD": 0.2
+    },
+    "start_date": "2020-01-02",
+    "end_date": "current",
+    "rebalance_frequency": "annually",
+    "plot_separately": true
+  }

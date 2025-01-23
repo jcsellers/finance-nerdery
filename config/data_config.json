@@ -1,0 +1,14 @@
+{
+    "sources": [
+      {
+        "type": "yahoo",
+        "tickers": ["UPRO", "SSO", "SPY", "TLT", "GLD"],
+        "file_path": "data/csv_files/yahoo_data.csv"
+      },
+      {
+        "type": "fred",
+        "file_path": "data/csv_files/fred_data.csv",
+        "ticker": "BAMLH0A0HYM2"
+      }
+    ]
+  }
