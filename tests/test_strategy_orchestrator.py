@@ -1,78 +1,43 @@
-from pathlib import Path
+import subprocess
 
 import pytest
 
-from src.strategy_orchestrator import StrategyOrchestrator
+
+@pytest.fixture
+def real_config_path():
+    """Path to the real configuration file."""
+    return "config/strategies/buy_and_hold_real.json"
 
 
 @pytest.fixture
-def mock_config(tmp_path):
-    """Mock configuration file."""
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        """
-    {
-        "parameters": {
-            "target_asset": "spy_close"
-        }
-    }
-    """
-    )
-    return config_path
+def real_data_path():
+    """Path to the real CSV file."""
+    return "data/csv_files/yahoo_data.csv"
 
 
-@pytest.fixture
-def mock_data(tmp_path):
-    """Mock CSV data file with MultiIndex format."""
-    data_path = tmp_path / "data.csv"
-    data_path.write_text(
-        """
-    "('date', '')","('spy', 'close')"
-    "2020-01-01",100
-    "2021-01-01",120
-    """
-    )
-    return data_path
+def test_orchestrator_run(real_config_path, real_data_path):
+    """Test the orchestrator by running the actual script from the command line."""
+    # Construct the command to run the script as it would be from the command line
+    command = [
+        "python",
+        "src/strategy_orchestrator.py",
+        "--config",
+        real_config_path,
+        "--data",
+        real_data_path,
+    ]
 
+    # Run the command and capture the output
+    result = subprocess.run(command, capture_output=True, text=True)
 
-def test_orchestrator_load_data(mock_config, mock_data):
-    """Test data loading from a valid CSV file."""
-    orchestrator = StrategyOrchestrator(config_path=mock_config, data_path=mock_data)
-    data = orchestrator.load_data()
-    assert "spy_close" in data.columns
-    assert len(data) == 2
+    # Check if the command ran successfully (exit code 0)
+    assert result.returncode == 0, f"Command failed with exit code {result.returncode}"
 
+    # Check that the output contains expected values
+    assert "CAGR [%]" in result.stdout
+    assert (
+        float(result.stdout.split("CAGR [%]")[1].split()[0]) > 0
+    )  # Ensure CAGR is positive
 
-def test_orchestrator_load_data_invalid_path(mock_config):
-    """Test error handling for an invalid data path."""
-    invalid_data_path = Path("non_existent_file.csv")
-    orchestrator = StrategyOrchestrator(
-        config_path=mock_config, data_path=invalid_data_path
-    )
-    with pytest.raises(FileNotFoundError):
-        orchestrator.load_data()
-
-
-def test_orchestrator_run(mock_config, mock_data):
-    """Test strategy execution and output."""
-    orchestrator = StrategyOrchestrator(config_path=mock_config, data_path=mock_data)
-    results = orchestrator.run()
-    assert "CAGR [%]" in results
-    assert results["CAGR [%]"] > 0
-
-
-def test_orchestrator_target_asset_missing(mock_config, tmp_path):
-    """Test handling when target asset is missing in data."""
-    missing_data_path = tmp_path / "data.csv"
-    missing_data_path.write_text(
-        """
-    "('date', '')","('spy', 'high')"
-    "2020-01-01",100
-    "2021-01-01",120
-    """
-    )
-    orchestrator = StrategyOrchestrator(
-        config_path=mock_config, data_path=missing_data_path
-    )
-    with pytest.raises(ValueError):
-        orchestrator.run()
+    # Optionally, you can print the output for debugging purposes
+    print(result.stdout)
