@@ -1,8 +1,12 @@
+import argparse
+import json
+import logging
 from pathlib import Path
 
 import pandas as pd
 
 
+# YahooDataReader class with fixes
 class YahooDataReader:
     def __init__(self, file_path):
         self.file_path = Path(file_path)
@@ -12,28 +16,43 @@ class YahooDataReader:
         """Load the Yahoo Finance data."""
         if not self.file_path.exists():
             raise FileNotFoundError(f"Data file not found at {self.file_path}")
-        self.data = pd.read_csv(self.file_path, header=[0, 1])  # MultiIndex columns
+        logging.info(f"Loading data from {self.file_path}")
+        self.data = pd.read_csv(
+            self.file_path, header=[0, 1]
+        )  # Load hierarchical columns
         self.flatten_columns()
-        self.set_date_index()
 
     def flatten_columns(self):
-        """Flatten the hierarchical column names."""
-        self.data.columns = ["_".join(col).strip() for col in self.data.columns]
-        self.data.rename(columns={"('date', '')": "date"}, inplace=True)
+        """Flatten MultiIndex columns for easier access."""
+        if isinstance(self.data.columns, pd.MultiIndex):
+            self.data.columns = [
+                f"{level1.lower()}_{level2.lower()}" if level2 else level1.lower()
+                for level1, level2 in self.data.columns
+            ]
+            logging.info(f"Flattened columns: {self.data.columns}")
 
-    def set_date_index(self):
-        """Set the 'date' column as the index."""
-        self.data["date"] = pd.to_datetime(self.data["date"])
-        self.data.set_index("date", inplace=True)
+    def get_symbol_data(self, symbol):
+        """Extract data for a specific symbol."""
+        self.load_data()
+        logging.info(f"Filtering data for symbol: {symbol}")
+        try:
+            # Normalize the symbol for matching
+            normalized_symbol = symbol.lower()
 
-    def get_ticker_data(self, ticker):
-        """Extract data for a specific ticker."""
-        ticker_prefix = f"{ticker}_"
-        return self.data.filter(like=ticker_prefix).rename(
-            columns=lambda col: col.replace(ticker_prefix, "")
-        )
+            # Strip suffixes from column names and create a mapping
+            stripped_columns = {col.split("_")[0]: col for col in self.data.columns}
 
-    def get_available_tickers(self):
-        """List all tickers available in the data."""
-        tickers = set(col.split("_")[0] for col in self.data.columns if "_" in col)
-        return tickers
+            # Attempt an exact match first
+            if normalized_symbol in stripped_columns:
+                matched_column = stripped_columns[normalized_symbol]
+                logging.info(f"Exact match found for {symbol}: {matched_column}")
+                return self.data[[matched_column]]
+
+            # Debug possible matches
+            logging.error(
+                f"Available stripped columns: {list(stripped_columns.keys())}"
+            )
+            raise KeyError(f"No matching columns found for symbol: {symbol}")
+        except KeyError as e:
+            logging.error(f"Error extracting data for symbol {symbol}: {e}")
+            raise ValueError(f"No data found for symbol: {symbol}")

@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 class FredDataReader:
     def __init__(self, file_path):
         self.file_path = Path(file_path)
