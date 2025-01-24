@@ -1,5 +1,3 @@
-config = f"""
-[sources]
 [sources.Yahoo_Finance]
 tickers = ["SPY", "UPRO"]
 start_date = "2020-01-01"
@@ -14,8 +12,7 @@ start_date = "2020-01-01"
 end_date = "2020-12-31"
 
 [output]
-output_dir = "{str(tmp_path).replace('\\', '\\\\')}"  # Escape backslashes
+output_dir = "data"  # Static directory for all output files
 
 [settings]
 missing_data_handling = "interpolate"
-"""

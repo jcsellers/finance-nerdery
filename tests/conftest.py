@@ -15,6 +15,14 @@ load_dotenv(dotenv_path)
 logging.info(f"Current Python Path: {sys.path}")
 
 
+print(f"Python Path: {sys.path}")
+print(f"Python Path: {sys.path}")
+print(f"Python Path: {sys.path}")
+print(f"Python Path: {sys.path}")
+print(f"Python Path: {sys.path}")
+print(f"Python Path: {sys.path}")
+print(f"Python Path: {sys.path}")
+
 # Validate required environment variables
 required_vars = ["FRED_API_KEY"]
 missing_vars = [var for var in required_vars if os.getenv(var) is None]

@@ -17,11 +17,24 @@ class YahooAcquisition:
     def fetch_data(self):
         """Fetch Yahoo Finance data using vectorbt."""
         logging.info(f"Fetching Yahoo Finance data for tickers: {self.tickers}")
-        data = vbt.YFData.download(
-            self.tickers, start=self.start_date, end=self.end_date
-        ).get("Close")
-        logging.info(f"Fetched data with columns: {data.columns}")
-        return data
+
+        # Fetch data from Yahoo Finance via vectorbt
+        try:
+            data = vbt.YFData.download(
+                self.tickers,
+                start=self.start_date,
+                end=self.end_date,
+            ).get(
+                "Close"
+            )  # Only fetch the "Close" prices
+
+            # Ensure consistent columns across tickers
+            data = data.ffill().bfill()  # Fill missing data forward and backward
+            logging.info(f"Fetched data with columns: {data.columns}")
+            return data
+        except Exception as e:
+            logging.error(f"Failed to fetch Yahoo Finance data: {e}")
+            raise RuntimeError("Yahoo Finance data fetching failed.") from e
 
     def save_data(self, data):
         """Save Yahoo Finance data to CSV and Parquet."""
@@ -51,8 +64,13 @@ class FredAcquisition:
         logging.info(
             f"Fetching FRED series {series_id} from {start_date} to {end_date}"
         )
+
+        # Format the file name to remove invalid characters
+        sanitized_start_date = pd.Timestamp(start_date).strftime("%Y-%m-%d")
+        sanitized_end_date = pd.Timestamp(end_date).strftime("%Y-%m-%d")
         cache_path = os.path.join(
-            self.cache_dir, f"{series_id}_{start_date}_{end_date}.csv"
+            self.cache_dir,
+            f"{series_id}_{sanitized_start_date}_{sanitized_end_date}.csv",
         )
 
         # Use cached data if available

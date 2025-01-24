@@ -2,7 +2,8 @@ import os
 
 import pandas as pd
 import pytest
-from aquisition import YahooAcquisition
+
+from acquisition import YahooAcquisition
 
 
 def test_yahoo_acquisition(tmp_path):

@@ -2,8 +2,8 @@ import os
 from unittest.mock import patch
 
 import pandas as pd
-import pytest
-from aquisition import FredAcquisition
+
+from acquisition import FredAcquisition
 
 
 @patch("acquisition.FredAcquisition.fetch_series")
@@ -27,5 +27,11 @@ def test_fred_acquisition(mock_fetch_series, tmp_path):
 
     csv_path = f"{output_dir}/{series_id}.csv"
     assert os.path.exists(csv_path), "FRED CSV file was not created."
+
+    # Load the saved CSV and validate its structure
     df = pd.read_csv(csv_path, index_col="Date", parse_dates=True)
-    assert "Value" in df.columns, "Missing 'Value' column in FRED CSV."
+    expected_columns = ["Open", "High", "Low", "Close", "Volume"]
+    assert (
+        list(df.columns) == expected_columns
+    ), f"Unexpected columns in FRED CSV: {df.columns}"
+    assert not df.empty, "FRED data is empty after saving."
