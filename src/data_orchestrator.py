@@ -67,11 +67,12 @@ class Orchestrator:
         yahoo_config = self.config["sources"]["Yahoo_Finance"]
         yahoo = YahooAcquisition(
             tickers=yahoo_config["tickers"],
-            start_date=start_date,  # Adjusted start_date
-            end_date=end_date,  # Adjusted end_date
+            start_date=start_date,
+            end_date=end_date,
             output_dir=self.config["output"]["output_dir"],
         )
         yahoo_data = yahoo.fetch_data()
+        logging.debug(f"Yahoo data after fetching: {yahoo_data.head()}")
         yahoo.save_data(yahoo_data)
 
         # FRED Acquisition
@@ -81,30 +82,30 @@ class Orchestrator:
             cache_dir=self.config["output"]["output_dir"],
             missing_data_handling=self.config["settings"]["missing_data_handling"],
         )
+        fred_data_dict = fred.fetch_all_series(
+            fred_config["series_ids"], start_date, end_date
+        )
+        for series_name, fred_data in fred_data_dict.items():
+            logging.debug(f"FRED data preview for {series_name}: {fred_data.head()}")
 
-        fred_data = pd.DataFrame()
-        for series_id in fred_config["series_ids"]:
-            output_path = f"{self.config['output']['output_dir']}/{series_id}.csv"
-            fred.fetch_and_save(
-                series_id=series_id,
-                start_date=start_date,  # Adjusted start_date
-                end_date=end_date,  # Adjusted end_date
-                output_path=output_path,
-            )
-            # Load and append the saved series
-            series_data = pd.read_csv(output_path, index_col="Date", parse_dates=True)
-            fred_data = pd.concat([fred_data, series_data], axis=1)
+        # Load saved Yahoo Finance data
+        yahoo_data_path = os.path.join(
+            self.config["output"]["output_dir"], "yahoo_data.csv"
+        )
+        yahoo_data = pd.read_csv(yahoo_data_path, index_col=0, parse_dates=True)
+
+        # Normalize Yahoo data's index to ensure no timezone issues
+        yahoo_data.index = yahoo_data.index.normalize()
 
         # Merge Datasets
-        merged_data = DataMerger.merge_datasets(
-            yahoo_data,
-            fred_data,
-            start_date=start_date,  # Adjusted start_date
-            end_date=end_date,  # Adjusted end_date
-        )
+        logging.info("Calling DataMerger.merge_datasets to align Yahoo and FRED data")
+        merged_data = DataMerger.merge_datasets(yahoo_data, fred_data_dict)
+        logging.debug(f"Merged data preview: {merged_data.head()}")
 
         # Save Merged Data
-        DataSaver.save_data(merged_data, self.config["output"]["output_dir"])
+        DataSaver.validate_and_save(
+            merged_data, self.config["output"]["output_dir"], name="merged_data"
+        )
 
 
 if __name__ == "__main__":
