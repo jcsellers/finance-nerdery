@@ -24,4 +24,7 @@ def test_yahoo_acquisition(tmp_path):
 
     # Validate CSV structure
     df = pd.read_csv(csv_path, index_col="Date", parse_dates=True)
-    assert all(ticker in df.columns for ticker in tickers), "Missing tickers in CSV."
+    expected_columns = [f"Close_{ticker}" for ticker in tickers]
+    assert all(
+        col in df.columns for col in expected_columns
+    ), "Missing expected ticker columns in CSV."

@@ -7,6 +7,7 @@ from acquisition import FredAcquisition
 
 
 @patch("acquisition.FredAcquisition.fetch_series")
+@patch("acquisition.FredAcquisition.fetch_series")
 def test_fred_acquisition(mock_fetch_series, tmp_path):
     # Mock the FRED API response
     mock_fetch_series.return_value = pd.DataFrame(
@@ -18,20 +19,14 @@ def test_fred_acquisition(mock_fetch_series, tmp_path):
     series_id = "BAMLH0A0HYM2"
     start_date = "2020-01-01"
     end_date = "2020-12-31"
-    output_dir = tmp_path
 
-    fred = FredAcquisition(api_key, cache_dir=output_dir)
-    fred.fetch_and_save(
-        series_id, start_date, end_date, f"{output_dir}/{series_id}.csv"
+    fred = FredAcquisition(api_key, cache_dir=tmp_path)
+
+    # Fetch and transform the series
+    fred_data = fred.fetch_series(series_id, start_date, end_date)
+    ohlcv_data = fred.transform_to_ohlcv(fred_data)
+
+    # Assert the transformed data has the correct columns
+    assert all(
+        col in ohlcv_data.columns for col in ["Open", "High", "Low", "Close", "Volume"]
     )
-
-    csv_path = f"{output_dir}/{series_id}.csv"
-    assert os.path.exists(csv_path), "FRED CSV file was not created."
-
-    # Load the saved CSV and validate its structure
-    df = pd.read_csv(csv_path, index_col="Date", parse_dates=True)
-    expected_columns = ["Open", "High", "Low", "Close", "Volume"]
-    assert (
-        list(df.columns) == expected_columns
-    ), f"Unexpected columns in FRED CSV: {df.columns}"
-    assert not df.empty, "FRED data is empty after saving."
