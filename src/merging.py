@@ -14,8 +14,9 @@ class DataMerger:
         return pd.DataFrame(index=trading_days)
 
     @staticmethod
+    @staticmethod
     def merge_datasets(yahoo_data, fred_data, start_date, end_date):
-        """Align Yahoo Finance and FRED data using NYSE calendar."""
+        """Align and merge Yahoo Finance and FRED data using NYSE calendar."""
         logging.info("Generating NYSE trading calendar")
         nyse = mcal.get_calendar("NYSE")
         nyse_schedule = nyse.schedule(start_date=start_date, end_date=end_date)
@@ -24,6 +25,9 @@ class DataMerger:
         logging.info("Reindexing datasets to NYSE trading days")
         yahoo_data = yahoo_data.reindex(nyse_trading_days).ffill().bfill()
         fred_data = fred_data.reindex(nyse_trading_days).ffill().bfill()
+
+        # Ensure unique column names for FRED data
+        fred_data.columns = [f"{col}_fred" for col in fred_data.columns]
 
         logging.info("Merging Yahoo Finance and FRED data")
         merged_data = pd.concat([yahoo_data, fred_data], axis=1)

@@ -1,4 +1,4 @@
-,SPY,UPRO,SSO,TLT,GLD,^VIX,^SPX,Open,High,Low,Close,Volume,Open,High,Low,Close,Volume
+,SPY,UPRO,SSO,TLT,GLD,^VIX,^SPX,Open_fred,High_fred,Low_fred,Close_fred,Volume_fred,Open_fred,High_fred,Low_fred,Close_fred,Volume_fred
 2020-01-02,,,,,,,,3.56,3.56,3.56,3.56,0,1.88,1.88,1.88,1.88,0.0
 2020-01-03,,,,,,,,3.61,3.61,3.61,3.61,0,1.8,1.8,1.8,1.8,0.0
 2020-01-06,,,,,,,,3.57,3.57,3.57,3.57,0,1.81,1.81,1.81,1.81,0.0
