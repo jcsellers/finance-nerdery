@@ -4,10 +4,14 @@ import os
 import pandas as pd
 import pandas_market_calendars as mcal
 import toml
+from dotenv import load_dotenv
 
 from acquisition import FredAcquisition, YahooAcquisition
 from merging import DataMerger
 from saving import DataSaver
+
+# Load environment variables from .env
+load_dotenv()
 
 
 class Orchestrator:

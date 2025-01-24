@@ -1,18 +1,18 @@
 [sources.Yahoo_Finance]
-tickers = ["SPY", "UPRO"]
+tickers = ["SPY", "UPRO", "SSO", "TLT", "GLD", "^VIX", "^SPX"]
 start_date = "2020-01-01"
 end_date = "2020-12-31"
 
 [sources.FRED]
-api_key = "test_api_key"
-series_ids = ["BAMLH0A0HYM2"]
+api_key = "your_real_fred_api_key"
+series_ids = ["BAMLH0A0HYM2", "DGS10"]
 
 [date_ranges]
 start_date = "2020-01-01"
 end_date = "2020-12-31"
 
 [output]
-output_dir = "data"  # Static directory for all output files
+output_dir = "data"
 
 [settings]
 missing_data_handling = "interpolate"

@@ -3,7 +3,6 @@ import os
 
 import pandas as pd
 import vectorbt as vbt
-from fredapi import Fred
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 
@@ -17,27 +16,36 @@ class YahooAcquisition:
     def fetch_data(self):
         """Fetch Yahoo Finance data using vectorbt."""
         logging.info(f"Fetching Yahoo Finance data for tickers: {self.tickers}")
+        valid_tickers = []
+        dataframes = []
 
-        # Fetch data from Yahoo Finance via vectorbt
-        try:
-            data = vbt.YFData.download(
-                self.tickers,
-                start=self.start_date,
-                end=self.end_date,
-            ).get(
-                "Close"
-            )  # Only fetch the "Close" prices
+        for ticker in self.tickers:
+            try:
+                ticker_data = vbt.YFData.download(
+                    ticker.strip().upper(),
+                    start=self.start_date,
+                    end=self.end_date,
+                ).get("Close")
+                if not ticker_data.empty:
+                    dataframes.append(ticker_data)
+                    valid_tickers.append(ticker)
+                else:
+                    logging.warning(f"No data found for ticker: {ticker}")
+            except Exception as e:
+                logging.warning(f"Failed to fetch data for ticker {ticker}: {e}")
 
-            # Ensure consistent columns across tickers
-            data = data.ffill().bfill()  # Fill missing data forward and backward
-            logging.info(f"Fetched data with columns: {data.columns}")
-            return data
-        except Exception as e:
-            logging.error(f"Failed to fetch Yahoo Finance data: {e}")
-            raise RuntimeError("Yahoo Finance data fetching failed.") from e
+        if not dataframes:
+            raise RuntimeError("No valid data fetched for any ticker.")
+
+        # Combine all ticker data into a single DataFrame
+        data = pd.concat(dataframes, axis=1)
+        data.columns = valid_tickers  # Use valid tickers as column names
+        data = data.ffill().bfill()  # Fill missing data
+        logging.info(f"Fetched data with valid columns: {data.columns}")
+        return data
 
     def save_data(self, data):
-        """Save Yahoo Finance data to CSV and Parquet."""
+        """Save Yahoo Finance data to CSV and Parquet formats."""
         csv_path = f"{self.output_dir}/yahoo_data.csv"
         parquet_path = f"{self.output_dir}/yahoo_data.parquet"
 
@@ -53,8 +61,9 @@ class FredAcquisition:
         self.api_key = api_key
         self.cache_dir = cache_dir
         self.missing_data_handling = missing_data_handling
+        from fredapi import Fred
+
         self.fred = Fred(api_key=self.api_key)
-        os.makedirs(self.cache_dir, exist_ok=True)
 
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10)
@@ -64,8 +73,6 @@ class FredAcquisition:
         logging.info(
             f"Fetching FRED series {series_id} from {start_date} to {end_date}"
         )
-
-        # Format the file name to remove invalid characters
         sanitized_start_date = pd.Timestamp(start_date).strftime("%Y-%m-%d")
         sanitized_end_date = pd.Timestamp(end_date).strftime("%Y-%m-%d")
         cache_path = os.path.join(
@@ -98,6 +105,15 @@ class FredAcquisition:
             logging.error(f"Failed to fetch series {series_id}: {e}", exc_info=True)
             raise RuntimeError(f"Error fetching FRED series {series_id}: {e}")
 
+    def fetch_and_save(self, series_id, start_date, end_date, output_path):
+        """Fetch a FRED series, transform to OHLCV, and save to a CSV."""
+        df = self.fetch_series(series_id, start_date, end_date)
+        df = self.handle_missing_data(df)
+        ohlcv = self.transform_to_ohlcv(df)
+        logging.info(f"Saving OHLCV data to {output_path}")
+        ohlcv.to_csv(output_path, index_label="Date")
+        logging.info(f"Saved OHLCV data to {output_path}")
+
     def handle_missing_data(self, df):
         """Handle missing data in the FRED dataset."""
         logging.info(
@@ -129,12 +145,3 @@ class FredAcquisition:
             index=df.index,
         )
         return ohlcv
-
-    def fetch_and_save(self, series_id, start_date, end_date, output_path):
-        """Fetch a FRED series, transform to OHLCV, and save to a CSV."""
-        df = self.fetch_series(series_id, start_date, end_date)
-        df = self.handle_missing_data(df)
-        ohlcv = self.transform_to_ohlcv(df)
-        logging.info(f"Saving OHLCV data to {output_path}")
-        ohlcv.to_csv(output_path, index_label="Date")
-        logging.info(f"Saved OHLCV data to {output_path}")
