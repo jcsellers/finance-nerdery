@@ -1,114 +1,198 @@
-# Finance Nerdery
+# Finance Nerdery Project README
 
 ## Overview
 
 Finance Nerdery is a comprehensive financial analysis pipeline designed to process financial data, calculate key metrics, compare strategies against benchmarks, and generate structured outputs. The pipeline is built with Python and leverages various libraries to ensure accurate and efficient analysis.
 
+---
+
 ## Features
 
-- **Data Import**: Import financial data from CSV files into an SQLite database.
-- **Data Validation**: Ensure the database schema matches the expected structure.
-- **Metrics Calculation**: Compute financial metrics including:
-  - Compound Annual Growth Rate (CAGR)
-  - Volatility
-  - Sharpe Ratio
-  - Sortino Ratio
-  - Maximum Drawdown (MDD)
-- **Benchmark Comparison**: Compare strategy performance against benchmarks, calculating Alpha and Beta.
-- **JSON Output**: Generate structured JSON files containing metrics and metadata.
-- **Unit Testing**: Validate the accuracy of metrics, database interactions, and outputs using `pytest`.
+### **1. Data Pipeline Overview**
+
+The data pipeline integrates financial data from two key sources:
+
+- **Yahoo Finance**:
+  - Provides historical OHLCV (Open, High, Low, Close, Volume) data for multiple tickers.
+  - Data is fetched using the `YahooAcquisition` class, saved as both CSV and Parquet formats.
+
+- **FRED (Federal Reserve Economic Data)**:
+  - Supplies time series data for economic indicators (e.g., interest rates, credit spreads).
+  - Data is fetched and transformed into OHLCV format via the `FredAcquisition` class.
+
+- **Merging**:
+  - Both datasets are aligned on NYSE trading days using the `DataMerger` class, ensuring a unified structure.
+  - Missing values are handled via forward- and backward-filling.
+
+- **Saving**:
+  - Processed data is saved by the `DataSaver` class to both CSV and Parquet formats.
+  - Validations ensure no duplicate columns or invalid structures.
+
+---
+
+### **2. Configuration Management**
+The project uses a `config.toml` file to dynamically configure the pipeline, strategies, and outputs. Sample structure:
+
+```toml
+[sources.Yahoo_Finance]
+tickers = ["SPY", "UPRO"]
+start_date = "2020-01-01"
+end_date = "2020-12-31"
+
+[sources.FRED]
+series_ids = ["BAMLH0A0HYM2"]
+
+[output]
+output_dir = "data/output"
+formats = ["csv", "parquet"]
+logs_dir = "logs"
+
+[benchmarks]
+[[benchmarks.strategies]]
+strategy_name = "buy_and_hold"
+ticker = "SPY"
+```
+
+---
+
+### **3. Metrics and Trade Stats**
+
+**Metrics** for each strategy:
+- Sharpe Ratio
+- Compound Annual Growth Rate (CAGR)
+- Max Drawdown
+- Total Return
+
+**Trade Statistics**:
+- Win Rate (%)
+- Best/Worst Trade (%)
+- Total Trades
+
+These are extracted using `vectorbt`'s `Portfolio.performance()` and `Portfolio.stats()` methods.
+
+---
 
 ## Prerequisites
 
 Ensure you have the following installed:
 
 - Python 3.7 or higher
-- `pip` (Python package installer)
+- pip (Python package installer)
+
+---
 
 ## Installation
 
-1. **Clone the Repository**:
+### Clone the Repository
+```bash
+git clone https://github.com/yourusername/finance-nerdery.git
+cd finance-nerdery
+```
 
-   ```bash
-   git clone https://github.com/yourusername/finance-nerdery.git
-   cd finance-nerdery
-Create a Virtual Environment (Optional but recommended):
-
-bash
-Copy code
+### Create a Virtual Environment (Optional but recommended)
+```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-Install Dependencies:
+```
 
-bash
-Copy code
+### Install Dependencies
+```bash
 pip install -r requirements.txt
-Configuration
-Configure the pipeline using the config.yaml file located in the config directory. Below is an example configuration:
+```
 
-yaml
-Copy code
-database:
-  path: "aligned_data.db"
-output:
-  path: "results/output.json"
-tickers:
-  - "AAPL"
-  - "MSFT"
-date_range:
-  start: "2020-01-01"
-  end: "2023-01-01"
-benchmarks:
-  - "SPY"
-database.path: Path to the SQLite database file.
-output.path: Path where the JSON output will be saved.
-tickers: List of stock tickers to analyze.
-date_range: Start and end dates for the analysis.
-benchmarks: List of benchmark tickers for comparison.
-Usage
-Prepare the Database:
+---
 
-Ensure your financial data CSV files are placed in the aligned directory. Then, run the following script to import the data into the SQLite database:
+## Configuration
 
-bash
-Copy code
+Configure the pipeline using the `config.toml` file. Below is an example structure:
+
+```toml
+[sources.Yahoo_Finance]
+tickers = ["SPY", "UPRO"]
+start_date = "2020-01-01"
+end_date = "2020-12-31"
+
+[output]
+output_dir = "data/output"
+formats = ["csv", "parquet"]
+logs_dir = "logs"
+
+[benchmarks]
+[[benchmarks.strategies]]
+strategy_name = "buy_and_hold"
+ticker = "SPY"
+```
+
+---
+
+## Usage
+
+### Prepare the Database
+Ensure your financial data CSV files are placed in the `aligned` directory. Then, run the following script to import the data into the SQLite database:
+```bash
 python src/csv_to_sqlite_import.py
-Run the Analysis Pipeline:
+```
 
+### Run the Analysis Pipeline
 Execute the main script with the configuration file:
-
-bash
-Copy code
+```bash
 python src/main.py --config config/config.yaml
+```
 This will process the data, calculate metrics, compare with benchmarks, and generate the output JSON file as specified in the configuration.
 
-Output
-The output JSON file will contain:
+---
 
-Metadata: Information about the tickers analyzed, date range, and benchmarks.
-Metrics: Calculated financial metrics for each ticker.
-Benchmark Comparison: Metrics comparing each ticker against the specified benchmarks.
-Testing
+## Directory Structure
+
+Proposed structure for modular development:
+```
+src/
+├── data_pipeline/
+├── orchestrator.py
+├── strategies/
+└── tests/
+```
+
+---
+
+## Output
+
+The output JSON file will contain:
+- **Metadata**: Information about the tickers analyzed, date range, and benchmarks.
+- **Metrics**: Calculated financial metrics for each ticker.
+- **Benchmark Comparison**: Metrics comparing each ticker against the specified benchmarks.
+
+---
+
+## Testing
+
 Unit tests are provided to ensure the accuracy and reliability of the pipeline. To run the tests:
 
-Navigate to the Tests Directory:
-
-bash
-Copy code
+### Navigate to the Tests Directory
+```bash
 cd tests
-Execute Tests with pytest:
+```
 
-bash
-Copy code
+### Execute Tests with pytest
+```bash
 pytest
+```
+
 The tests cover various aspects of the pipeline, including metric calculations, database interactions, and output generation. Mocking is used where appropriate to simulate external dependencies.
 
-Documentation
+---
+
+## Documentation
+
 For detailed information on the pipeline's functionality, refer to the documentation.
 
-Contributing
-Contributions are welcome! Please read the contributing guidelines for more information.
+---
 
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
+## Additional Notes for FN_Developer GPTs
+
+- Your role includes ensuring the pipeline is modular, extensible, and integrates seamlessly with new strategies.
+- Prioritize robust logging and error handling.
+- Always validate datasets before saving to ensure compatibility with downstream analysis.
+
+---
 
